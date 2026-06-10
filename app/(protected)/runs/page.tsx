@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { format } from 'date-fns'
+import Link from 'next/link'
 import UploadButton from '@/components/UploadButton'
+import SyncButton from '@/components/SyncButton'
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -27,8 +29,8 @@ export default async function RunsPage() {
       duration: true,
       avgPace: true,
       avgHeartRate: true,
-      maxHeartRate: true,
       sport: true,
+      source: true,
     },
   })
 
@@ -38,7 +40,7 @@ export default async function RunsPage() {
   return (
     <div className="space-y-6">
       {/* Header row */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">All Runs</h1>
           {totalRuns > 0 && (
@@ -47,14 +49,17 @@ export default async function RunsPage() {
             </p>
           )}
         </div>
-        <UploadButton />
+        <div className="flex items-center gap-2">
+          <SyncButton />
+          <UploadButton />
+        </div>
       </div>
 
       {/* Table */}
       {activities.length === 0 ? (
         <div className="text-center py-24 text-zinc-400">
           <p className="text-lg font-medium">No runs yet</p>
-          <p className="text-sm mt-1">Upload a GPX or FIT file to get started</p>
+          <p className="text-sm mt-1">Upload a GPX or FIT file, or sync from Intervals.icu</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
@@ -67,15 +72,26 @@ export default async function RunsPage() {
                 <th className="px-5 py-3 font-medium text-right">Time</th>
                 <th className="px-5 py-3 font-medium text-right">Pace</th>
                 <th className="px-5 py-3 font-medium text-right">Avg HR</th>
+                <th className="px-5 py-3 font-medium text-right">Source</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-50">
               {activities.map(a => (
-                <tr key={a.id} className="hover:bg-zinc-50 transition-colors">
+                <tr
+                  key={a.id}
+                  className="hover:bg-zinc-50 transition-colors"
+                >
                   <td className="px-5 py-3.5 text-zinc-500 whitespace-nowrap">
                     {format(new Date(a.date), 'MMM d, yyyy')}
                   </td>
-                  <td className="px-5 py-3.5 text-zinc-900 font-medium">{a.name}</td>
+                  <td className="px-5 py-3.5 text-zinc-900 font-medium">
+                    <Link
+                      href={`/runs/${a.id}`}
+                      className="hover:text-zinc-600 hover:underline underline-offset-2 transition-colors"
+                    >
+                      {a.name}
+                    </Link>
+                  </td>
                   <td className="px-5 py-3.5 text-zinc-900 text-right tabular-nums">
                     {a.distance.toFixed(2)} km
                   </td>
@@ -87,6 +103,15 @@ export default async function RunsPage() {
                   </td>
                   <td className="px-5 py-3.5 text-zinc-500 text-right tabular-nums">
                     {a.avgHeartRate ? `${a.avgHeartRate} bpm` : '—'}
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${
+                      a.source === 'intervals'
+                        ? 'bg-violet-50 text-violet-700'
+                        : 'bg-zinc-100 text-zinc-500'
+                    }`}>
+                      {a.source === 'intervals' ? 'intervals.icu' : 'upload'}
+                    </span>
                   </td>
                 </tr>
               ))}
