@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/opt/homebrew/bin/npx create-next-app@latest . --typescript --tailwind --app --no-eslint --no-src-dir --import-alias \"@/*\" --yes)",
+      "Bash(mkdir -p /tmp/running-app-docs)",
+      "Bash(mv /Users/ronran/Desktop/GitHub/running-app/FEATURES.md /Users/ronran/Desktop/GitHub/running-app/PRODUCT.md /Users/ronran/Desktop/GitHub/running-app/README.md /tmp/running-app-docs/)",
+      "Bash(/opt/homebrew/bin/npx prisma *)"
+    ]
+  }
+}

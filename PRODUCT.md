@@ -23,12 +23,12 @@ A personal running dashboard for a single authenticated user. Connects to both S
 ## Core Features
 
 - **Auth**: Single-user login to protect the app
-- **Strava integration**: OAuth connection to pull runs
-- **Garmin integration**: OAuth/API connection to pull runs
+- **GPX/FIT file upload**: Drag-and-drop activity import — works with any GPS watch
+- **Intervals.icu sync**: Optional automatic sync via free intervals.icu API (Garmin/Strava feed through it)
 - **Run list**: Paginated list of all runs with key stats (date, distance, pace, duration)
 - **Run detail**: Individual run page with GPS route map
 - **Heatmap**: All-runs overlay on a single map
-- **Training trends**: Weekly mileage, pace over time — charts
+- **Training trends**: Weekly mileage, zone distribution, consistency calendar
 - **Goal tracking**: Set weekly/monthly distance goals, track progress
 
 ---
@@ -44,25 +44,23 @@ A personal running dashboard for a single authenticated user. Connects to both S
 ## Build Waves
 
 ### Wave 1 — Foundation
-> Goal: Working app skeleton with auth and run data flowing in from Strava
+> Goal: Working app skeleton with auth and run data flowing in via file upload
 
 - [ ] Next.js project setup with Tailwind, Prisma, NextAuth
-- [ ] PostgreSQL schema: User, Activity, SyncLog
+- [ ] PostgreSQL schema: User, Activity
 - [ ] Single-user credential login (email + password)
-- [ ] Strava OAuth connection flow (connect/disconnect)
-- [ ] Sync endpoint that pulls runs from Strava and stores them
+- [ ] GPX/FIT file upload — parse and store activity data (date, distance, pace, duration, GPS coordinates, heart rate)
 - [ ] Basic run list page (no maps yet, just stats)
-- [ ] **Test**: Login works, Strava connects, runs appear in list
+- [ ] **Test**: Login works, upload a GPX/FIT file, run appears in list with correct stats
 
-### Wave 2 — Garmin + Run Detail
-> Goal: Both data sources working, individual run pages live
+### Wave 2 — Intervals.icu Sync + Run Detail
+> Goal: Automatic sync connected, individual run pages live
 
-- [ ] Garmin Connect API integration (OAuth or token-based)
-- [ ] Sync endpoint for Garmin activities
-- [ ] Deduplicate activities from both sources
+- [ ] Intervals.icu API integration (API key auth)
+- [ ] Sync endpoint that pulls activities from intervals.icu and stores them
+- [ ] Deduplicate activities (uploaded vs. synced)
 - [ ] Run detail page with stats breakdown
-- [ ] Store GPS coordinates (polyline/coordinates) per activity
-- [ ] **Test**: Garmin syncs, no duplicates, detail page loads correctly
+- [ ] **Test**: Intervals.icu syncs, no duplicates, detail page loads correctly
 
 ### Wave 3 — Maps
 > Goal: GPS routes visible on individual run pages and heatmap view
