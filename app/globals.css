@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* Must be layered: unlayered CSS outranks Tailwind's @layer utilities,
+   and .mapboxgl-map's `position: relative` would override `absolute` on
+   the map container, collapsing it to zero height. */
+@import "mapbox-gl/dist/mapbox-gl.css" layer(base);
 
 :root {
   --background: #ffffff;

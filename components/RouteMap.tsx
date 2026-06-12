@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { Map as MapboxMap } from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
 
 export interface RoutePoint {
   lat: number
