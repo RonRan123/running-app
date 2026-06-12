@@ -56,6 +56,58 @@ export interface LatLng {
  * the streams endpoint returns only latitudes (flat number array), while `/map`
  * returns proper `latlngs: [[lat, lng], ...]` pairs.
  */
+export interface ActivityStreams {
+  time: number[]            // seconds from start
+  heartrate: number[] | null
+  velocity: number[] | null // m/s
+  altitude: number[] | null // meters
+  cadence: number[] | null
+  distance: number[] | null // cumulative meters
+}
+
+const STREAM_TYPES = ['time', 'heartrate', 'velocity_smooth', 'altitude', 'cadence', 'distance'] as const
+
+/**
+ * Fetch raw per-sample streams for a single activity.
+ * Returns null if the activity has no stream data (e.g. manual entries).
+ * The streams endpoint returns an array of {type, data} objects.
+ */
+export async function fetchStreams(activityId: string): Promise<ActivityStreams | null> {
+  const params = new URLSearchParams({ types: STREAM_TYPES.join(',') })
+  const res = await fetch(`${BASE}/activity/${activityId}/streams.json?${params}`, {
+    headers: { Authorization: authHeader() },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) return null
+
+  const data: unknown = await res.json()
+  if (!Array.isArray(data)) return null
+
+  const byType = new Map<string, number[]>()
+  for (const s of data) {
+    if (
+      typeof s === 'object' && s !== null &&
+      typeof (s as { type?: unknown }).type === 'string' &&
+      Array.isArray((s as { data?: unknown }).data)
+    ) {
+      byType.set((s as { type: string }).type, (s as { data: number[] }).data)
+    }
+  }
+
+  const time = byType.get('time')
+  if (!time || time.length === 0) return null
+
+  return {
+    time,
+    heartrate: byType.get('heartrate') ?? null,
+    velocity: byType.get('velocity_smooth') ?? null,
+    altitude: byType.get('altitude') ?? null,
+    cadence: byType.get('cadence') ?? null,
+    distance: byType.get('distance') ?? null,
+  }
+}
+
 export async function fetchGpsStream(activityId: string): Promise<LatLng[] | null> {
   const res = await fetch(`${BASE}/activity/${activityId}/map`, {
     headers: { Authorization: authHeader() },

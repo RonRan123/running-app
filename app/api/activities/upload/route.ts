@@ -44,6 +44,20 @@ export async function POST(request: Request) {
           sport: parsed.sport,
           coordinates: parsed.coordinates as object,
           source: 'upload',
+          ...(parsed.streams
+            ? {
+                stream: {
+                  create: {
+                    time: parsed.streams.time,
+                    heartrate: parsed.streams.heartrate ?? undefined,
+                    velocity: parsed.streams.velocity ?? undefined,
+                    altitude: parsed.streams.altitude ?? undefined,
+                    cadence: parsed.streams.cadence ?? undefined,
+                    distance: parsed.streams.distance ?? undefined,
+                  },
+                },
+              }
+            : {}),
         },
       })
 

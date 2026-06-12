@@ -1,5 +1,5 @@
 import FitParser from 'fit-file-parser'
-import type { ParsedActivity } from './gpx'
+import type { ParsedActivity, ParsedStreams } from './gpx'
 
 export async function parseFit(buffer: ArrayBuffer): Promise<ParsedActivity> {
   const parser = new FitParser({
@@ -62,6 +62,47 @@ export async function parseFit(buffer: ArrayBuffer): Promise<ParsedActivity> {
     maxHeartRate,
     sport: capitalizeFirst(sport),
     coordinates,
+    streams: buildStreams(records),
+  }
+}
+
+/**
+ * Build per-sample streams from FIT record messages.
+ * With lengthUnit='km' / speedUnit='km/h', the parser returns distance and
+ * altitude in km and speed in km/h — convert back to meters and m/s here.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildStreams(records: any[]): ParsedStreams | null {
+  const timed = records.filter(r => typeof r.elapsed_time === 'number')
+  if (timed.length < 2) return null
+
+  const time: number[] = []
+  const heartrate: number[] = []
+  const velocity: number[] = []
+  const altitude: number[] = []
+  const cadence: number[] = []
+  const distance: number[] = []
+
+  for (const r of timed) {
+    time.push(Math.round(r.elapsed_time))
+    heartrate.push(typeof r.heart_rate === 'number' ? r.heart_rate : 0)
+    const speedKmh = typeof r.enhanced_speed === 'number' ? r.enhanced_speed : r.speed
+    velocity.push(typeof speedKmh === 'number' ? speedKmh / 3.6 : 0)
+    const altKm = typeof r.enhanced_altitude === 'number' ? r.enhanced_altitude : r.altitude
+    altitude.push(typeof altKm === 'number' ? altKm * 1000 : 0)
+    cadence.push(typeof r.cadence === 'number' ? r.cadence : 0)
+    distance.push(typeof r.distance === 'number' ? Math.round(r.distance * 1000 * 10) / 10 : 0)
+  }
+
+  const has = (key: string) => timed.some(r => typeof r[key] === 'number')
+
+  return {
+    time,
+    heartrate: has('heart_rate') ? heartrate : null,
+    velocity: has('enhanced_speed') || has('speed') ? velocity : null,
+    altitude: has('enhanced_altitude') || has('altitude') ? altitude : null,
+    cadence: has('cadence') ? cadence : null,
+    distance: has('distance') ? distance : null,
   }
 }
 

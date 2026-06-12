@@ -1,5 +1,14 @@
 import { XMLParser } from 'fast-xml-parser'
 
+export interface ParsedStreams {
+  time: number[]            // seconds from start
+  heartrate: number[] | null
+  velocity: number[] | null // m/s
+  altitude: number[] | null // meters
+  cadence: number[] | null
+  distance: number[] | null // cumulative meters
+}
+
 export interface ParsedActivity {
   name: string
   date: Date
@@ -10,6 +19,7 @@ export interface ParsedActivity {
   maxHeartRate: number | null
   sport: string
   coordinates: { lat: number; lng: number; ele?: number }[]
+  streams: ParsedStreams | null
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -41,7 +51,7 @@ export function parseGpx(buffer: ArrayBuffer): ParsedActivity {
   const trkseg = trk?.trkseg
   const segs = Array.isArray(trkseg) ? trkseg : [trkseg]
 
-  const rawPoints: { lat: number; lon: number; ele?: number; time?: string; hr?: number }[] = []
+  const rawPoints: { lat: number; lon: number; ele?: number; time?: string; hr?: number; cad?: number }[] = []
 
   for (const seg of segs) {
     if (!seg?.trkpt) continue
@@ -54,8 +64,9 @@ export function parseGpx(buffer: ArrayBuffer): ParsedActivity {
       const ele = pt.ele != null ? Number(pt.ele) : undefined
       const time = pt.time ? String(pt.time) : undefined
 
-      // HR can live in several extension namespaces
+      // HR and cadence can live in several extension namespaces
       let hr: number | undefined
+      let cad: number | undefined
       const ext = pt.extensions
       if (ext) {
         const tpx =
@@ -66,12 +77,15 @@ export function parseGpx(buffer: ArrayBuffer): ParsedActivity {
           const hrVal =
             tpx['gpxtpx:hr'] ?? tpx['ns3:hr'] ?? tpx.hr
           if (hrVal != null) hr = Number(hrVal)
+          const cadVal =
+            tpx['gpxtpx:cad'] ?? tpx['ns3:cad'] ?? tpx.cad
+          if (cadVal != null) cad = Number(cadVal)
         }
         // Some devices put hr directly under extensions
         if (hr == null && (ext.hr != null)) hr = Number(ext.hr)
       }
 
-      rawPoints.push({ lat, lon, ele, time, hr })
+      rawPoints.push({ lat, lon, ele, time, hr, cad })
     }
   }
 
@@ -119,6 +133,66 @@ export function parseGpx(buffer: ArrayBuffer): ParsedActivity {
     maxHeartRate,
     sport: capitalizeFirst(sport),
     coordinates,
+    streams: buildStreams(rawPoints),
+  }
+}
+
+/** Build per-sample streams from timestamped track points. Returns null without timestamps. */
+function buildStreams(
+  rawPoints: { lat: number; lon: number; ele?: number; time?: string; hr?: number; cad?: number }[],
+): ParsedStreams | null {
+  const timed = rawPoints.filter(p => p.time)
+  if (timed.length < 2) return null
+
+  const t0 = new Date(timed[0].time!).getTime()
+  const time: number[] = []
+  const distance: number[] = []
+  const velocity: number[] = []
+  const altitude: number[] = []
+  const heartrate: number[] = []
+  const cadence: number[] = []
+
+  let cumMeters = 0
+  let lastHr = timed.find(p => p.hr != null)?.hr ?? 0
+  let lastCad = timed.find(p => p.cad != null)?.cad ?? 0
+  let lastEle = timed.find(p => p.ele != null)?.ele ?? 0
+
+  for (let i = 0; i < timed.length; i++) {
+    const p = timed[i]
+    const t = Math.round((new Date(p.time!).getTime() - t0) / 1000)
+
+    if (i > 0) {
+      const prev = timed[i - 1]
+      const segMeters = haversineKm(prev.lat, prev.lon, p.lat, p.lon) * 1000
+      cumMeters += segMeters
+      const dt = t - time[time.length - 1]
+      velocity.push(dt > 0 ? segMeters / dt : 0)
+    } else {
+      velocity.push(0)
+    }
+
+    if (p.hr != null) lastHr = p.hr
+    if (p.cad != null) lastCad = p.cad
+    if (p.ele != null) lastEle = p.ele
+
+    time.push(t)
+    distance.push(Math.round(cumMeters * 10) / 10)
+    altitude.push(lastEle)
+    heartrate.push(lastHr)
+    cadence.push(lastCad)
+  }
+
+  const hasHr = timed.some(p => p.hr != null)
+  const hasCad = timed.some(p => p.cad != null)
+  const hasEle = timed.some(p => p.ele != null)
+
+  return {
+    time,
+    heartrate: hasHr ? heartrate : null,
+    velocity,
+    altitude: hasEle ? altitude : null,
+    cadence: hasCad ? cadence : null,
+    distance,
   }
 }
 

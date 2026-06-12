@@ -148,6 +148,37 @@ The Wave 5 analytics answer "how is my aerobic base developing?" Wave 6 answers 
 
 ---
 
+### Wave 7 — Race Goals, PRs, Auto-Sync & Run Deep Dive
+> Goal: Close the coaching loop — "am I on track for my goal race?" — and add a per-run microscope for aerobic-engine development.
+
+**Auto-Sync on Login**
+- [x] Every login fires a background Intervals.icu sync (last 30 days) via a NextAuth `signIn` event — fire-and-forget, never blocks login
+- [x] Manual Sync button retained for full-history pulls
+
+**Raw Stream Storage**
+- [x] New `ActivityStream` table: per-second time / heart rate / velocity / altitude / cadence / distance arrays per run
+- [x] Streams fetched from the Intervals.icu `streams.json` endpoint on sync (with backfill for already-synced runs)
+- [x] GPX/FIT uploads now extract and store the same streams
+
+**Run Deep Dive tab (`/deep-dive`)**
+- [x] Defaults to the latest run; dropdown to inspect any run; linked from each run detail page
+- [x] Summary header: distance, duration, pace, avg/max HR, TRIMP (relative effort)
+- [x] HR chart with the Maffetone (180 − age) target band — age entered once and stored; headline % of run at/below MAF
+- [x] Smoothed pace chart with Pace ↔ GAP toggle (Minetti grade-adjustment, Strava-style)
+- [x] Elevation profile, per-mi/km splits table (pace, GAP, HR, elevation gain), time-in-zone bar
+
+**Race Goals & Predictions (`/goals`)**
+- [x] Race goal CRUD: name, date, distance, goal time
+- [x] Riegel-formula predicted finish from your best recent effort (90-day window), color-coded vs goal
+
+**Personal Records**
+- [x] Best efforts auto-detected for 1K / 1 mile / 5K / 10K / HM / marathon as rolling sub-splits of the distance stream (whole-run fallback marked "est.")
+- [x] PR board with progression chart per distance; PR badge on record-holding run pages
+
+- [x] **Test**: Login returns in <100 ms while sync runs in background; new runs + streams appear without manual sync; MAF band renders at 180 − age; Riegel prediction verified by hand (4:00:03 from a 52:11 10K); goal CRUD and validation errors verified; unauthenticated requests rejected
+
+---
+
 ## Rules for Building
 
 1. Complete one wave fully before starting the next.

@@ -3,6 +3,43 @@ import { notFound } from 'next/navigation'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import RouteMap, { type RoutePoint } from '@/components/RouteMap'
+import RunDetailStats from '@/components/RunDetailStats'
+import { bestEfforts, type EffortActivity } from '@/lib/records'
+
+function asNumberArray(value: unknown): number[] | null {
+  return Array.isArray(value) && value.every(v => typeof v === 'number')
+    ? (value as number[])
+    : null
+}
+
+/** Labels of the PR targets this run currently holds the record for. */
+async function currentPrLabels(activityId: string): Promise<string[]> {
+  const activities = await prisma.activity.findMany({
+    select: {
+      id: true,
+      name: true,
+      date: true,
+      distance: true,
+      duration: true,
+      stream: { select: { time: true, distance: true } },
+    },
+  })
+  const effortActivities: EffortActivity[] = activities.map(a => {
+    const time = a.stream ? asNumberArray(a.stream.time) : null
+    const distance = a.stream ? asNumberArray(a.stream.distance) : null
+    return {
+      id: a.id,
+      name: a.name,
+      date: a.date.toISOString(),
+      distance: a.distance,
+      duration: a.duration,
+      streams: time && distance ? { time, distance } : null,
+    }
+  })
+  return bestEfforts(effortActivities)
+    .filter(r => r.best.activityId === activityId)
+    .map(r => r.target.label)
+}
 
 function parseCoordinates(value: unknown): RoutePoint[] {
   if (!Array.isArray(value)) return []
@@ -13,20 +50,6 @@ function parseCoordinates(value: unknown): RoutePoint[] {
       typeof (p as RoutePoint).lat === 'number' &&
       typeof (p as RoutePoint).lng === 'number',
   )
-}
-
-function formatDuration(seconds: number) {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-  return `${m}:${String(s).padStart(2, '0')}`
-}
-
-function formatPace(minPerKm: number) {
-  const m = Math.floor(minPerKm)
-  const s = Math.round((minPerKm - m) * 60)
-  return `${m}:${String(s).padStart(2, '0')} /km`
 }
 
 export default async function RunDetailPage({
@@ -40,37 +63,7 @@ export default async function RunDetailPage({
   if (!activity) notFound()
 
   const coordinates = parseCoordinates(activity.coordinates as unknown)
-
-  const stats = [
-    {
-      label: 'Distance',
-      value: `${activity.distance.toFixed(2)} km`,
-    },
-    {
-      label: 'Duration',
-      value: formatDuration(activity.duration),
-    },
-    {
-      label: 'Avg Pace',
-      value: activity.avgPace ? formatPace(activity.avgPace) : '—',
-    },
-    {
-      label: 'Avg Heart Rate',
-      value: activity.avgHeartRate ? `${activity.avgHeartRate} bpm` : '—',
-    },
-    {
-      label: 'Max Heart Rate',
-      value: activity.maxHeartRate ? `${activity.maxHeartRate} bpm` : '—',
-    },
-    {
-      label: 'Sport',
-      value: activity.sport,
-    },
-    {
-      label: 'Source',
-      value: activity.source === 'intervals' ? 'Intervals.icu' : 'Uploaded file',
-    },
-  ]
+  const prLabels = await currentPrLabels(id)
 
   return (
     <div className="space-y-6">
@@ -86,27 +79,45 @@ export default async function RunDetailPage({
       </Link>
 
       {/* Header */}
-      <div>
-        <p className="text-sm text-zinc-500">
-          {format(new Date(activity.date), 'EEEE, MMMM d, yyyy')}
-        </p>
-        <h1 className="text-2xl font-semibold text-zinc-900 mt-0.5">{activity.name}</h1>
+      <div className="flex items-end justify-between flex-wrap gap-3">
+        <div>
+          <p className="text-sm text-zinc-500">
+            {format(new Date(activity.date), 'EEEE, MMMM d, yyyy')}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <h1 className="text-2xl font-semibold text-zinc-900">{activity.name}</h1>
+            {prLabels.map(label => (
+              <span
+                key={label}
+                className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-0.5"
+                title={`Current personal record for ${label}`}
+              >
+                {label} PR
+              </span>
+            ))}
+          </div>
+        </div>
+        <Link
+          href={`/deep-dive?run=${activity.id}`}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-900 hover:text-zinc-600 transition-colors"
+        >
+          Deep dive
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {stats.map(stat => (
-          <div
-            key={stat.label}
-            className="bg-white rounded-xl border border-zinc-200 px-4 py-4"
-          >
-            <p className="text-xs text-zinc-400 uppercase tracking-wide font-medium mb-1">
-              {stat.label}
-            </p>
-            <p className="text-lg font-semibold text-zinc-900 tabular-nums">{stat.value}</p>
-          </div>
-        ))}
-      </div>
+      {/* Stats grid — client component so it follows the stored mi/km preference */}
+      <RunDetailStats
+        distance={activity.distance}
+        duration={activity.duration}
+        avgPace={activity.avgPace}
+        avgHeartRate={activity.avgHeartRate}
+        maxHeartRate={activity.maxHeartRate}
+        sport={activity.sport}
+        source={activity.source}
+      />
 
       {/* Route map */}
       {coordinates.length > 0 ? (
