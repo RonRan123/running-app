@@ -2,6 +2,18 @@ import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import RouteMap, { type RoutePoint } from '@/components/RouteMap'
+
+function parseCoordinates(value: unknown): RoutePoint[] {
+  if (!Array.isArray(value)) return []
+  return (value as unknown[]).filter(
+    (p): p is RoutePoint =>
+      typeof p === 'object' &&
+      p !== null &&
+      typeof (p as RoutePoint).lat === 'number' &&
+      typeof (p as RoutePoint).lng === 'number',
+  )
+}
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -26,6 +38,8 @@ export default async function RunDetailPage({
 
   const activity = await prisma.activity.findUnique({ where: { id } })
   if (!activity) notFound()
+
+  const coordinates = parseCoordinates(activity.coordinates as unknown)
 
   const stats = [
     {
@@ -94,13 +108,11 @@ export default async function RunDetailPage({
         ))}
       </div>
 
-      {/* Map placeholder — removed in Wave 3 and replaced with actual map */}
-      {Array.isArray(activity.coordinates) && (activity.coordinates as unknown[]).length > 0 ? (
+      {/* Route map */}
+      {coordinates.length > 0 ? (
         <div className="bg-white rounded-2xl border border-zinc-200 p-6">
-          <p className="text-sm font-medium text-zinc-500 mb-1">Route</p>
-          <div className="h-56 rounded-lg bg-zinc-50 flex items-center justify-center text-zinc-300 text-sm">
-            Map coming in Wave 3
-          </div>
+          <p className="text-sm font-medium text-zinc-500 mb-3">Route</p>
+          <RouteMap coordinates={coordinates} />
         </div>
       ) : null}
     </div>

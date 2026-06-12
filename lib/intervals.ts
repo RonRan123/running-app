@@ -41,3 +41,44 @@ export async function fetchActivities(
 
   return res.json()
 }
+
+export interface LatLng {
+  lat: number
+  lng: number
+}
+
+/**
+ * Fetch the GPS track for a single activity.
+ * Returns an array of {lat, lng} points, or null if the activity has no GPS data.
+ * `activityId` is the raw Intervals.icu id (e.g. "i12345678"), without our "intervals:" prefix.
+ *
+ * Note: we use the `/map` endpoint rather than `streams.json?types=latlng` —
+ * the streams endpoint returns only latitudes (flat number array), while `/map`
+ * returns proper `latlngs: [[lat, lng], ...]` pairs.
+ */
+export async function fetchGpsStream(activityId: string): Promise<LatLng[] | null> {
+  const res = await fetch(`${BASE}/activity/${activityId}/map`, {
+    headers: { Authorization: authHeader() },
+    cache: 'no-store',
+  })
+
+  // 404 / 422 etc. simply means no map data — treat as "no GPS"
+  if (!res.ok) return null
+
+  const data: unknown = await res.json()
+  const latlngs =
+    typeof data === 'object' && data !== null
+      ? (data as { latlngs?: unknown }).latlngs
+      : undefined
+
+  if (!Array.isArray(latlngs) || latlngs.length === 0) return null
+
+  const points: LatLng[] = []
+  for (const p of latlngs) {
+    if (Array.isArray(p) && typeof p[0] === 'number' && typeof p[1] === 'number') {
+      points.push({ lat: p[0], lng: p[1] })
+    }
+  }
+
+  return points.length > 0 ? points : null
+}
