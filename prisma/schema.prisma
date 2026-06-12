@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Activity {
-  id           String   @id @default(cuid())
+  id           String          @id @default(cuid())
   name         String
   date         DateTime
   distance     Float
@@ -16,9 +16,40 @@ model Activity {
   avgPace      Float?
   avgHeartRate Int?
   maxHeartRate Int?
-  sport        String   @default("Run")
+  sport        String          @default("Run")
   coordinates  Json?
-  source       String   @default("upload")
-  externalId   String?  @unique
-  createdAt    DateTime @default(now())
+  source       String          @default("upload")
+  externalId   String?         @unique
+  createdAt    DateTime        @default(now())
+  stream       ActivityStream?
+}
+
+// Raw per-sample time-series for a run. Each Json column is a number[]
+// aligned index-by-index with `time` (seconds from start).
+model ActivityStream {
+  id         String   @id @default(cuid())
+  activityId String   @unique
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  time       Json
+  heartrate  Json?
+  velocity   Json? // m/s
+  altitude   Json? // meters
+  cadence    Json?
+  distance   Json? // cumulative meters
+  fetchedAt  DateTime @default(now())
+}
+
+// Single-row settings table (id is always 1)
+model UserSettings {
+  id  Int  @id @default(1)
+  age Int?
+}
+
+model RaceGoal {
+  id        String   @id @default(cuid())
+  name      String
+  date      DateTime
+  distance  Float // km
+  goalTime  Int // seconds
+  createdAt DateTime @default(now())
 }

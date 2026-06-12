@@ -23,8 +23,8 @@ const DEFAULT_MAX_HR = 190
 // Effort bands as a fraction of max HR. "Easy" tops out at ~78% HRmax
 // (the upper edge of Zone 2 in a five-zone model), "hard" starts at ~87%
 // (threshold and above).
-const EASY_CEILING = 0.78
-const MODERATE_CEILING = 0.87
+export const EASY_CEILING = 0.78
+export const MODERATE_CEILING = 0.87
 // Zone 2 band used for the aerobic pace trend.
 const ZONE2_FLOOR = 0.65
 

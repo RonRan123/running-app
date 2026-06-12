@@ -24,6 +24,12 @@ export default async function ProtectedLayout({ children }: { children: React.Re
               <Link href="/analysis" className="text-zinc-500 hover:text-zinc-900 transition-colors">
                 Analysis
               </Link>
+              <Link href="/deep-dive" className="text-zinc-500 hover:text-zinc-900 transition-colors">
+                Deep Dive
+              </Link>
+              <Link href="/goals" className="text-zinc-500 hover:text-zinc-900 transition-colors">
+                Goals
+              </Link>
             </nav>
           </div>
           <SignOutButton />

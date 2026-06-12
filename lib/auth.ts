@@ -1,6 +1,9 @@
 import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
+import { intervalsConfigured, runSync } from '@/lib/sync'
+
+const AUTO_SYNC_WINDOW_DAYS = 30
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -23,4 +26,15 @@ export const authOptions: NextAuthOptions = {
   ],
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
+  events: {
+    // Fire-and-forget: pull recent runs from Intervals.icu on every login.
+    // Deliberately not awaited so login is never blocked by a slow sync.
+    async signIn() {
+      if (!intervalsConfigured()) return
+      const oldest = new Date(Date.now() - AUTO_SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+      runSync(oldest).catch(err => {
+        console.error('Auto-sync on login failed:', err)
+      })
+    },
+  },
 }
