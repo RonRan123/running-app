@@ -84,6 +84,68 @@ A personal running dashboard for a single authenticated user. Connects to both S
 
 > See [FEATURES.md](./FEATURES.md) for the full coaching feature backlog and future wave ideas.
 
+### Wave 5 — Analysis Tab: Aerobic Development
+> Goal: A dedicated analysis space where you can interrogate any date window and understand how your aerobic engine is developing — the heart-rate-centric view a marathon coach checks every week.
+
+The key insight from the research: the single most valuable signal for marathon development is whether your heart rate at a given effort is trending **down** over time. That means you're doing the same work with less cardiovascular strain — your aerobic engine is getting stronger. This wave builds the tooling to see that clearly.
+
+**Infrastructure**
+- [ ] New `/analysis` route with "Analysis" tab added to the nav
+- [ ] Date range control at the top of the page: a dual-handle slider for quick scrubbing, plus manual date-entry inputs for precision — defaults to 2 weeks ago → today on every page load
+- [ ] All charts on the page respond live to the date range control
+- [ ] Unit preference (mi/km toggle, same as the runs list) applied to all distance/pace values
+
+**Aerobic Development Scatter (Heart Rate)**
+- [ ] Scatter plot: distance on x-axis, average HR on y-axis, one dot per run in the selected period
+- [ ] Dots colored on a cool-to-warm gradient from oldest (blue) to most recent (orange/red), so the visual direction of the cloud immediately reveals whether HR at a given distance is falling — aerobic improvement — or rising — accumulated fatigue or overreach
+- [ ] Tooltip on hover: run name, date, distance, avg HR, avg pace
+
+**Aerobic Efficiency Trend**
+- [ ] Line chart of aerobic efficiency (pace ÷ avg HR, in sec/km per bpm, or sec/mi per bpm) plotted per run over time
+- [ ] A rising line means the same cardiovascular effort produces faster running — the single most distilled signal of aerobic fitness development
+- [ ] Only include runs where HR data is present; show an empty state if fewer than 3 qualifying runs exist in the window
+
+**HR Zone Distribution**
+- [ ] Stacked bar chart: one bar per week in the selected period, broken into easy / moderate / hard % by time
+- [ ] Targets zone: most marathon coaches prescribe 75–80 % easy. Highlight weeks that fall significantly below that threshold with a subtle visual marker
+- [ ] Richer than the Wave 4 summary — this view makes polarized training patterns (or the lack of them) immediately visible
+
+**Heatmap Polish**
+- [ ] Heatmap page defaults to centered on Manhattan, NYC (zoom ~12) instead of fitting all tracks globally — makes the initial view immediately useful for a NYC-area runner
+
+- [ ] **Test**: Date range slider updates all three charts simultaneously; aerobic efficiency correctly inverts pace/HR; zone bars add to 100 %; heatmap opens on Manhattan
+
+---
+
+### Wave 6 — Training Load & Race Readiness
+> Goal: Coach-grade load management — the metrics that predict injury risk and race-day readiness before race day arrives.
+
+The Wave 5 analytics answer "how is my aerobic base developing?" Wave 6 answers "am I building load safely, and am I ready to race?"
+
+**Fitness-Fatigue Curve**
+- [ ] Compute TRIMP (Training Impulse) per activity: duration × avg HR × a zone-weighted multiplier — a principled proxy for training stress that requires no power meter
+- [ ] Three-line chart over a rolling ~6 months:
+  - **CTL** (Chronic Training Load) — 42-day exponentially weighted average of TRIMP — represents fitness
+  - **ATL** (Acute Training Load) — 7-day exponentially weighted average of TRIMP — represents fatigue
+  - **TSB** (Training Stress Balance) — CTL minus ATL — represents race readiness (positive = fresh, negative = fatigued)
+- [ ] Tooltip for each day showing the three values and most recent run
+
+**Acute:Chronic Load Ratio (Injury Risk Indicator)**
+- [ ] Single prominent number: ATL ÷ CTL for the current week
+- [ ] Color-coded: green (0.8–1.3 = safe build), amber (1.3–1.5 = caution), red (> 1.5 = high injury risk)
+- [ ] Short contextual label below it (e.g. "Sustainable build" / "Pushing the limit — consider an easy day" / "Overreach risk — rest recommended")
+- [ ] Research basis: acute:chronic ratio > 1.5 is the most widely validated injury-risk threshold in sports science
+
+**Long Run Progression**
+- [ ] Bar chart: the longest run of each week over the last 16 weeks (a typical marathon block)
+- [ ] Helps identify whether long run distance is progressing at the recommended ~10 % per week ceiling, plateauing, or spiking dangerously
+
+**Pace at Aerobic Effort (Zone 2 Pace Trend)**
+- [ ] Filter to runs where > 60 % of HR time was in Zone 2 (easy aerobic), plot their average pace per run over time
+- [ ] This isolates aerobic base speed — the number that reliably predicts marathon potential — free of the noise introduced by tempo, intervals, and race days
+
+- [ ] **Test**: TRIMP values match manual calculations on a sample activity; ATL/CTL curves move in the correct direction when a high-load week is added; injury ratio alert color changes at the correct thresholds; long run bars reflect actual data
+
 ---
 
 ## Rules for Building

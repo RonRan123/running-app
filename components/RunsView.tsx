@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import UploadButton from '@/components/UploadButton'
 import SyncButton from '@/components/SyncButton'
-import { formatDistance, formatDuration, formatPace, type Unit } from '@/lib/units'
+import UnitToggle from '@/components/UnitToggle'
+import { useUnit } from '@/lib/useUnit'
+import { formatDistance, formatDuration, formatPace } from '@/lib/units'
 
 export interface RunRow {
   id: string
@@ -18,20 +19,8 @@ export interface RunRow {
   source: string
 }
 
-const UNIT_STORAGE_KEY = 'distance-unit'
-
 export default function RunsView({ activities }: { activities: RunRow[] }) {
-  const [unit, setUnit] = useState<Unit>('mi')
-
-  useEffect(() => {
-    const stored = localStorage.getItem(UNIT_STORAGE_KEY)
-    if (stored === 'km' || stored === 'mi') setUnit(stored)
-  }, [])
-
-  function changeUnit(next: Unit) {
-    setUnit(next)
-    localStorage.setItem(UNIT_STORAGE_KEY, next)
-  }
+  const { unit, changeUnit } = useUnit()
 
   const totalKm = activities.reduce((sum, a) => sum + a.distance, 0)
   const totalRuns = activities.length
@@ -50,20 +39,7 @@ export default function RunsView({ activities }: { activities: RunRow[] }) {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div className="inline-flex items-center rounded-lg border border-zinc-300 bg-white p-0.5">
-            {(['mi', 'km'] as const).map(u => (
-              <button
-                key={u}
-                onClick={() => changeUnit(u)}
-                aria-pressed={unit === u}
-                className={`px-2.5 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  unit === u ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-zinc-900'
-                }`}
-              >
-                {u}
-              </button>
-            ))}
-          </div>
+          <UnitToggle unit={unit} onChange={changeUnit} />
           <SyncButton />
           <UploadButton />
         </div>

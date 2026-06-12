@@ -54,17 +54,12 @@ export default function HeatmapMap() {
 
       mapboxgl.accessToken = TOKEN as string
 
-      const first = tracks[0][0]
-      const bounds = new mapboxgl.LngLatBounds(first, first)
-      for (const track of tracks) {
-        for (const c of track) bounds.extend(c)
-      }
-
       const map = new mapboxgl.Map({
         container: containerRef.current,
         style: 'mapbox://styles/mapbox/dark-v11',
-        bounds,
-        fitBoundsOptions: { padding: 60 },
+        // Default view: Manhattan. Tracks elsewhere are reachable by panning.
+        center: [-73.9712, 40.7831],
+        zoom: 11.5,
         attributionControl: false,
       })
       mapRef.current = map
