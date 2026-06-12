@@ -1,9 +1,23 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { fetchActivities } from '@/lib/intervals'
+import { fetchActivities, fetchGpsStream } from '@/lib/intervals'
+import type { Prisma } from '@prisma/client'
 
 const RUN_TYPES = new Set(['Run', 'VirtualRun', 'TrailRun', 'Treadmill'])
+
+const GPS_FETCH_DELAY_MS = 100
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+/** Fetch GPS for an Intervals.icu activity; never throws (GPS is best-effort). */
+async function getGps(intervalsId: string) {
+  try {
+    return await fetchGpsStream(intervalsId)
+  } catch {
+    return null
+  }
+}
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
@@ -38,12 +52,25 @@ export async function POST(request: Request) {
 
   let synced = 0
   let skipped = 0
+  let gpsAdded = 0
 
   for (const a of runs) {
     const externalId = `intervals:${a.id}`
 
     const existing = await prisma.activity.findUnique({ where: { externalId } })
     if (existing) {
+      // Backfill GPS for activities synced before we fetched coordinates
+      if (existing.coordinates === null) {
+        const gps = await getGps(a.id)
+        if (gps) {
+          await prisma.activity.update({
+            where: { id: existing.id },
+            data: { coordinates: gps as unknown as Prisma.InputJsonValue },
+          })
+          gpsAdded++
+        }
+        await sleep(GPS_FETCH_DELAY_MS)
+      }
       skipped++
       continue
     }
@@ -53,6 +80,10 @@ export async function POST(request: Request) {
       a.average_speed > 0
         ? Math.round((1000 / (a.average_speed * 60)) * 100) / 100
         : null
+
+    const gps = await getGps(a.id)
+    if (gps) gpsAdded++
+    await sleep(GPS_FETCH_DELAY_MS)
 
     await prisma.activity.create({
       data: {
@@ -66,10 +97,11 @@ export async function POST(request: Request) {
         sport: a.type,
         source: 'intervals',
         externalId,
+        coordinates: gps ? (gps as unknown as Prisma.InputJsonValue) : undefined,
       },
     })
     synced++
   }
 
-  return Response.json({ synced, skipped, total: runs.length })
+  return Response.json({ synced, skipped, gpsAdded, total: runs.length })
 }
