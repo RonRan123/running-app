@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseGpx } from '@/lib/parsers/gpx'
 import { parseFit } from '@/lib/parsers/fit'
+import { matchActivityToSegments } from '@/lib/segmentMatching'
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
         continue
       }
 
-      await prisma.activity.create({
+      const created = await prisma.activity.create({
         data: {
           name: parsed.name,
           date: parsed.date,
@@ -60,6 +61,9 @@ export async function POST(request: Request) {
             : {}),
         },
       })
+
+      // Best-effort segment matching — a failure never fails the upload
+      await matchActivityToSegments(created.id).catch(() => {})
 
       results.push({ name: file.name, success: true })
     } catch (err) {

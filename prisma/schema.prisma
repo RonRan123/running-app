@@ -22,6 +22,7 @@ model Activity {
   externalId   String?         @unique
   createdAt    DateTime        @default(now())
   stream       ActivityStream?
+  segmentEfforts SegmentEffort[]
 }
 
 // Raw per-sample time-series for a run. Each Json column is a number[]
@@ -43,6 +44,41 @@ model ActivityStream {
 model UserSettings {
   id  Int  @id @default(1)
   age Int?
+}
+
+// A named start-to-finish stretch of road, defined from one run's GPS track.
+// `polyline` is a {lat,lng}[] reference track used for display and length.
+model Segment {
+  id        String          @id @default(cuid())
+  name      String
+  polyline  Json
+  startLat  Float
+  startLng  Float
+  endLat    Float
+  endLng    Float
+  distance  Float // km along the reference polyline
+  createdAt DateTime        @default(now())
+  efforts   SegmentEffort[]
+}
+
+// One run's pass through a segment (fastest pass if the run crossed it twice).
+// startIdx/endIdx are sample indices into the activity's stream arrays.
+model SegmentEffort {
+  id         String   @id @default(cuid())
+  segmentId  String
+  segment    Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  activityId String
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  startIdx   Int
+  endIdx     Int
+  elapsed    Int // seconds
+  avgHr      Int?
+  avgPace    Float? // min/km
+  avgGap     Float? // min/km
+  elevGain   Float? // meters
+  createdAt  DateTime @default(now())
+
+  @@unique([segmentId, activityId])
 }
 
 model RaceGoal {

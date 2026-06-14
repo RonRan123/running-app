@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { fetchActivities, fetchGpsStream, fetchStreams } from '@/lib/intervals'
 import type { ActivityStreams } from '@/lib/intervals'
+import { matchActivityToSegments } from '@/lib/segmentMatching'
 import type { Prisma } from '@prisma/client'
 
 const RUN_TYPES = new Set(['Run', 'VirtualRun', 'TrailRun', 'Treadmill'])
@@ -24,6 +25,15 @@ async function getStreams(intervalsId: string) {
     return await fetchStreams(intervalsId)
   } catch {
     return null
+  }
+}
+
+/** Match a run against saved segments; never throws (matching is best-effort). */
+async function matchSegments(activityId: string) {
+  try {
+    await matchActivityToSegments(activityId)
+  } catch {
+    // ignore — a failed match never blocks a sync
   }
 }
 
@@ -78,6 +88,7 @@ export async function runSync(oldest: Date): Promise<SyncResult> {
       include: { stream: { select: { id: true } } },
     })
     if (existing) {
+      let backfilled = false
       // Backfill GPS for activities synced before we fetched coordinates
       if (existing.coordinates === null) {
         const gps = await getGps(a.id)
@@ -87,6 +98,7 @@ export async function runSync(oldest: Date): Promise<SyncResult> {
             data: { coordinates: gps as unknown as Prisma.InputJsonValue },
           })
           gpsAdded++
+          backfilled = true
         }
         await sleep(FETCH_DELAY_MS)
       }
@@ -96,9 +108,11 @@ export async function runSync(oldest: Date): Promise<SyncResult> {
         if (streams) {
           await prisma.activityStream.create({ data: streamData(existing.id, streams) })
           streamsAdded++
+          backfilled = true
         }
         await sleep(FETCH_DELAY_MS)
       }
+      if (backfilled) await matchSegments(existing.id)
       skipped++
       continue
     }
@@ -135,6 +149,7 @@ export async function runSync(oldest: Date): Promise<SyncResult> {
       await prisma.activityStream.create({ data: streamData(created.id, streams) })
       streamsAdded++
     }
+    await matchSegments(created.id)
     await sleep(FETCH_DELAY_MS)
   }
 

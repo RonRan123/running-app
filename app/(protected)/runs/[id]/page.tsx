@@ -5,6 +5,7 @@ import Link from 'next/link'
 import RouteMap, { type RoutePoint } from '@/components/RouteMap'
 import RunDetailStats from '@/components/RunDetailStats'
 import { bestEfforts, type EffortActivity } from '@/lib/records'
+import { formatDuration } from '@/lib/units'
 
 function asNumberArray(value: unknown): number[] | null {
   return Array.isArray(value) && value.every(v => typeof v === 'number')
@@ -64,6 +65,11 @@ export default async function RunDetailPage({
 
   const coordinates = parseCoordinates(activity.coordinates as unknown)
   const prLabels = await currentPrLabels(id)
+  const segmentEfforts = await prisma.segmentEffort.findMany({
+    where: { activityId: id },
+    include: { segment: { select: { id: true, name: true, distance: true } } },
+    orderBy: { segment: { createdAt: 'desc' } },
+  })
 
   return (
     <div className="space-y-6">
@@ -97,15 +103,28 @@ export default async function RunDetailPage({
             ))}
           </div>
         </div>
-        <Link
-          href={`/deep-dive?run=${activity.id}`}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-900 hover:text-zinc-600 transition-colors"
-        >
-          Deep dive
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
+        <div className="flex items-center gap-4">
+          {coordinates.length > 0 ? (
+            <Link
+              href={`/segments/new?run=${activity.id}`}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-900 hover:text-zinc-600 transition-colors"
+            >
+              Create segment
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </Link>
+          ) : null}
+          <Link
+            href={`/deep-dive?run=${activity.id}`}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-900 hover:text-zinc-600 transition-colors"
+          >
+            Deep dive
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
       </div>
 
       {/* Stats grid — client component so it follows the stored mi/km preference */}
@@ -124,6 +143,31 @@ export default async function RunDetailPage({
         <div className="bg-white rounded-2xl border border-zinc-200 p-6">
           <p className="text-sm font-medium text-zinc-500 mb-3">Route</p>
           <RouteMap coordinates={coordinates} />
+        </div>
+      ) : null}
+
+      {/* Segments this run matched */}
+      {segmentEfforts.length > 0 ? (
+        <div className="bg-white rounded-2xl border border-zinc-200 p-6">
+          <p className="text-sm font-medium text-zinc-500 mb-3">Segments on this run</p>
+          <ul className="divide-y divide-zinc-50">
+            {segmentEfforts.map(e => (
+              <li key={e.id}>
+                <Link
+                  href={`/segments?segment=${e.segment.id}`}
+                  className="flex items-center justify-between py-2.5 text-sm group"
+                >
+                  <span className="font-medium text-zinc-900 group-hover:text-zinc-600 transition-colors">
+                    {e.segment.name}
+                  </span>
+                  <span className="text-zinc-500">
+                    {formatDuration(e.elapsed)}
+                    {e.avgHr != null ? ` · ${e.avgHr} bpm` : ''}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
     </div>
