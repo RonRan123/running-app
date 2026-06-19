@@ -211,6 +211,17 @@ The deep insight: a scatter plot of HR over time is motivating, but nothing beat
 
 ---
 
+### Wave 9 — Branding & Public Landing Page
+> Goal: Give the app a public face and a proper identity before sharing it.
+
+- [x] App renamed to **RUNNA**
+- [x] Public landing page at `/` — full-screen Central Park hero image, "Track Every Mile. Own Every Run." headline, brief app description, Get Started CTA
+- [x] Strava-style nav: RUNNA logo (favicon) top-left, Log In button top-right
+- [x] Password updated to `Running-Ninja-Knicks23`
+- [x] Page title and metadata updated to RUNNA throughout
+
+---
+
 ## Rules for Building
 
 1. Complete one wave fully before starting the next.

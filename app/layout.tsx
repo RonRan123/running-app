@@ -6,8 +6,8 @@ import Providers from '@/components/Providers'
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 
 export const metadata: Metadata = {
-  title: 'Running Dashboard',
-  description: 'Personal running log and coaching dashboard',
+  title: 'RUNNA',
+  description: 'Your personal running dashboard. Track every mile, analyze performance, and visualize your routes.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
