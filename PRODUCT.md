@@ -179,6 +179,49 @@ The Wave 5 analytics answer "how is my aerobic base developing?" Wave 6 answers 
 
 ---
 
+### Wave 8 — Segments & Route Comparison
+> Goal: Make it effortless to compare the same stretch of road across different dates, so aerobic improvement is visible as concrete numbers — not just abstract trends.
+
+The deep insight: a scatter plot of HR over time is motivating, but nothing beats seeing your HR on the exact same 3-mile stretch drop from 158 bpm to 144 bpm over a training block. This wave builds that comparison surface on top of the per-second stream data already stored.
+
+**Segment Library**
+- [ ] New `/segments` tab in the nav
+- [ ] A segment is a named start-to-finish stretch defined by drawing on a map (click start point, click end point — no complex UI)
+- [ ] Segments are saved to the database with a name, start/end lat-lng, and a reference GPS polyline extracted from the defining run
+- [ ] "Create segment from this run" shortcut button on the run detail page — pre-fills the route from that run's GPS track so the user can trim and name it in seconds
+
+**Automatic Run Matching**
+- [ ] On save, each segment is matched against all stored runs: a run qualifies if it passes within 50 m of both the start and end points in the correct order
+- [ ] Matching runs are stored in a `SegmentEffort` join table: segment, activity, entry index, exit index, elapsed time, avg HR, avg pace, avg GAP, elevation gain
+- [ ] New runs are matched on sync/upload — no manual action required
+
+**Segment Comparison View**
+- [ ] Selecting a segment shows a ranked effort table: one row per matched run, columns for date, elapsed time, avg pace, avg GAP, avg HR, and aerobic efficiency (pace ÷ HR) — sortable by any column, defaulting to date descending
+- [ ] Best effort per column highlighted (fastest time, lowest HR, highest efficiency)
+- [ ] Two overlaid charts time-aligned from segment entry:
+  - HR trace per run, colored oldest-to-newest on the same blue→orange gradient used in the Wave 5 scatter — the visual direction of the bundle shows adaptation at a glance
+  - Pace/GAP trace with the same color scheme and a toggle matching the deep dive
+- [ ] Clicking any row in the table highlights that run's trace in both charts and opens its full run detail in a side panel
+
+**Discoverability**
+- [ ] Run detail page surfaces a "Segments on this run" card listing any saved segments the run matched, each linking to that segment's comparison view
+- [ ] Analysis page links to `/segments` with a prompt to create a first segment if none exist
+
+- [ ] **Test**: A segment created from run A auto-matches run B which shares the route; a run with the opposite direction does not match; effort table values match manual calculation from the stream data; adding a new run via sync automatically creates a `SegmentEffort` row if it matches; chart traces align correctly at time-zero (segment entry point, not run start)
+
+---
+
+### Wave 9 — Branding & Public Landing Page
+> Goal: Give the app a public face and a proper identity before sharing it.
+
+- [x] App renamed to **RUNNA**
+- [x] Public landing page at `/` — full-screen Central Park hero image, "Track Every Mile. Own Every Run." headline, brief app description, Get Started CTA
+- [x] Strava-style nav: RUNNA logo (favicon) top-left, Log In button top-right
+- [x] Password updated to `Running-Ninja-Knicks23`
+- [x] Page title and metadata updated to RUNNA throughout
+
+---
+
 ## Rules for Building
 
 1. Complete one wave fully before starting the next.
