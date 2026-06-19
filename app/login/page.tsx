@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -32,10 +33,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+    <div className="min-h-screen flex flex-col bg-zinc-50">
+      <nav className="px-8 py-6">
+        <Link href="/" className="flex items-center gap-3 w-fit">
+          <img src="/favicon.ico" alt="" className="w-8 h-8" />
+          <span className="text-zinc-900 text-2xl font-bold tracking-widest">RUNNA</span>
+        </Link>
+      </nav>
+
+      <div className="flex-1 flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Running Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">Welcome back</h1>
           <p className="mt-1 text-sm text-zinc-500">Sign in to your account</p>
         </div>
 
@@ -84,6 +93,7 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+      </div>
       </div>
     </div>
   )
