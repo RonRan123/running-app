@@ -53,3 +53,12 @@ model RaceGoal {
   goalTime  Int // seconds
   createdAt DateTime @default(now())
 }
+
+model LoginEvent {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+  country   String?
+  city      String?
+}

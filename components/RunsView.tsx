@@ -30,7 +30,7 @@ export default function RunsView({ activities }: { activities: RunRow[] }) {
       {/* Header row */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-900">All Runs</h1>
+          <h1 className="text-xl md:text-2xl font-semibold text-zinc-900">All Runs</h1>
           {totalRuns > 0 && (
             <p className="text-sm text-zinc-500 mt-0.5">
               {totalRuns} {totalRuns === 1 ? 'run' : 'runs'} · {formatDistance(totalKm, unit, 1)}{' '}
@@ -52,8 +52,8 @@ export default function RunsView({ activities }: { activities: RunRow[] }) {
           <p className="text-sm mt-1">Upload a GPX or FIT file, or sync from Intervals.icu</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-zinc-100 text-left text-zinc-400 text-xs uppercase tracking-wide">
                 <th className="px-5 py-3 font-medium">Date</th>

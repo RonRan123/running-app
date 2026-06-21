@@ -27,7 +27,7 @@ export default function SplitsTable({ splits, unit }: { splits: Split[]; unit: U
         <ChartEmpty message="Not enough distance data to compute splits." />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[420px]">
             <thead>
               <tr className="text-xs text-zinc-400 uppercase tracking-wide">
                 <th className="text-left font-medium py-2 pr-4">{unit}</th>
