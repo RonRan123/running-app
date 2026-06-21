@@ -164,17 +164,40 @@ export interface WeeklyVolume {
   runCount: number
 }
 
-/** Total distance and run count per calendar week for the given activities. */
-export function weeklyVolume(activities: AnalysisActivity[]): WeeklyVolume[] {
-  const weeks = new Map<string, { distanceKm: number; runCount: number }>()
+/**
+ * Total distance and run count per calendar week.
+ * When `from` and `to` are provided every week in that range is included,
+ * with zeros for weeks that had no runs.
+ */
+export function weeklyVolume(
+  activities: AnalysisActivity[],
+  from?: Date,
+  to?: Date,
+): WeeklyVolume[] {
+  const data = new Map<string, { distanceKm: number; runCount: number }>()
   for (const a of activities) {
     const key = format(startOfWeek(new Date(a.date), { weekStartsOn: 1 }), 'yyyy-MM-dd')
-    const w = weeks.get(key) ?? { distanceKm: 0, runCount: 0 }
+    const w = data.get(key) ?? { distanceKm: 0, runCount: 0 }
     w.distanceKm += a.distance
     w.runCount += 1
-    weeks.set(key, w)
+    data.set(key, w)
   }
-  return [...weeks.entries()]
+
+  if (from && to) {
+    // Walk every Monday between from and to and fill gaps with zeros.
+    const result: WeeklyVolume[] = []
+    let cursor = startOfWeek(from, { weekStartsOn: 1 })
+    const end = startOfWeek(to, { weekStartsOn: 1 })
+    while (cursor <= end) {
+      const key = format(cursor, 'yyyy-MM-dd')
+      const w = data.get(key) ?? { distanceKm: 0, runCount: 0 }
+      result.push({ weekStart: key, ...w })
+      cursor = addDays(cursor, 7)
+    }
+    return result
+  }
+
+  return [...data.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([weekStart, w]) => ({ weekStart, ...w }))
 }
