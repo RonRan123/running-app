@@ -158,6 +158,27 @@ export function weeklyZoneDistribution(
     })
 }
 
+export interface WeeklyVolume {
+  weekStart: string // yyyy-MM-dd (Monday)
+  distanceKm: number // total km for the week
+  runCount: number
+}
+
+/** Total distance and run count per calendar week for the given activities. */
+export function weeklyVolume(activities: AnalysisActivity[]): WeeklyVolume[] {
+  const weeks = new Map<string, { distanceKm: number; runCount: number }>()
+  for (const a of activities) {
+    const key = format(startOfWeek(new Date(a.date), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+    const w = weeks.get(key) ?? { distanceKm: 0, runCount: 0 }
+    w.distanceKm += a.distance
+    w.runCount += 1
+    weeks.set(key, w)
+  }
+  return [...weeks.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([weekStart, w]) => ({ weekStart, ...w }))
+}
+
 export interface WeeklyLongRun {
   weekStart: string // yyyy-MM-dd (Monday)
   distance: number // km, longest single run that week

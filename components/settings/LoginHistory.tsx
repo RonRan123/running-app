@@ -9,6 +9,7 @@ interface LoginEvent {
   ipAddress: string | null
   userAgent: string | null
   country: string | null
+  region: string | null
   city: string | null
 }
 
@@ -41,7 +42,10 @@ function parseDevice(ua: string | null): string {
 }
 
 function formatLocation(event: LoginEvent): string {
+  if (event.city && event.region) return `${event.city}, ${event.region}`
   if (event.city && event.country) return `${event.city}, ${event.country}`
+  if (event.city) return event.city
+  if (event.region) return event.region
   if (event.country) return event.country
   return '—'
 }
