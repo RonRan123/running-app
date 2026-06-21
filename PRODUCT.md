@@ -255,6 +255,47 @@ The goal is a smooth one-thumb experience on a 390 px screen — not a stripped-
 
 ---
 
+### Wave 11 — Location in Login History, Deep Dive Inline & Weekly Volume Chart
+> Goal: Enrich the login audit trail with geographic detail, consolidate the run deep dive into the run detail page, and add a weekly volume chart to the analysis tab.
+
+**Login History: City & State**
+
+The Wave 10 `LoginEvent` schema already stores `country` and `city` via MaxMind GeoLite2 City. Adding **state / region** is fully feasible with the same local database — `record.subdivisions[0].names.en` returns the state or province for any IP that resolves to a sub-national region.
+
+- [ ] Add a `region` column (nullable `String`) to the `LoginEvent` Prisma model alongside the existing `city` and `country` columns
+- [ ] On every login event, populate `region` from the MaxMind lookup — same fire-and-forget write that already stores city and country; no additional latency
+- [ ] Update the Settings login history table to show a combined "City, State" column (e.g. "New York, NY") using the stored `city` and `region` values; fall back to whatever fields are available (city only, region only, or "—") if the IP doesn't resolve to both
+
+**Run Deep Dive — Inline on Run Detail Page**
+
+The `/deep-dive` route (Wave 7) is removed. All deep dive content moves to the individual run detail page (`/runs/[id]`), appearing below the route map in a clearly labelled section.
+
+- [ ] Remove the Deep Dive nav link and the `/deep-dive` route entirely
+- [ ] On `/runs/[id]`, after the existing route map, render a **Deep Dive** section containing all the content that was on the deep dive page:
+  - Summary header: distance, duration, pace, avg/max HR, TRIMP
+  - HR chart with MAF band (180 − age) and headline % at/below MAF
+  - Smoothed pace chart with Pace ↔ GAP toggle
+  - Elevation profile
+  - Per-mi/km splits table (pace, GAP, HR, elevation gain)
+  - Time-in-zone bar
+- [ ] The deep dive section only renders if stream data exists for the run; show a clean empty state ("No stream data available for this run") otherwise
+- [ ] Remove the "Run Deep Dive" dropdown that previously let users switch between runs — the run detail page already scopes everything to a single run
+
+**Analysis Tab — Weekly Volume Chart**
+
+Below all existing analysis charts, add a stacked bar chart that shows how many miles and how many runs were completed in each calendar week within the currently selected date range.
+
+- [ ] One bar per calendar week in the selected range; x-axis labels show the week-start date (e.g. "Jun 9")
+- [ ] Each bar has two stacked segments: **Miles** (bottom, primary brand color) and **Runs** (top, secondary accent color)
+- [ ] Both segments are scaled on the same y-axis as total bar height = miles + run count — the intent is a quick visual of volume, not precise run-count comparison; a legend clearly labels both segments
+- [ ] Tooltip on hover/tap shows week range, total miles, and run count for that week
+- [ ] Chart responds live to the date range slider like all other analysis charts
+- [ ] Empty state if no runs exist in the selected window
+
+- [ ] **Test**: `region` field populates in the Settings table for a known US IP (e.g. "New York, NY"); Settings table gracefully shows partial data for IPs that only resolve to country; deep dive section appears on `/runs/[id]` for a run with stream data and shows the correct empty state for a run without; `/deep-dive` route returns 404; weekly volume chart bars reflect the correct week buckets and update when the date range slider moves; stacked segments and tooltip values match the underlying run data
+
+---
+
 ## Rules for Building
 
 1. Complete one wave fully before starting the next.

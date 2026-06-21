@@ -10,12 +10,14 @@ import {
   estimateMaxHr,
   fitnessFatigue,
   longRunByWeek,
+  weeklyVolume,
   weeklyZoneDistribution,
   type AnalysisActivity,
 } from '@/lib/analysis'
 import AerobicScatter from './AerobicScatter'
 import EfficiencyTrend from './EfficiencyTrend'
 import ZoneDistribution from './ZoneDistribution'
+import WeeklyVolumeChart from './WeeklyVolumeChart'
 import FitnessFatigue from './FitnessFatigue'
 import LoadRatioCard from './LoadRatioCard'
 import LongRunProgression from './LongRunProgression'
@@ -50,6 +52,7 @@ export default function AnalysisView({ activities }: { activities: AnalysisActiv
 
   const maxHr = useMemo(() => estimateMaxHr(activities), [activities])
   const weeklyZones = useMemo(() => weeklyZoneDistribution(inRange, maxHr), [inRange, maxHr])
+  const weeklyVol = useMemo(() => weeklyVolume(inRange, range.from, range.to), [inRange, range])
   const load = useMemo(() => fitnessFatigue(activities, maxHr), [activities, maxHr])
   const loadRatio = useMemo(() => acuteChronicRatio(load), [load])
   const longRuns = useMemo(() => longRunByWeek(activities), [activities])
@@ -74,6 +77,8 @@ export default function AnalysisView({ activities }: { activities: AnalysisActiv
         to={range.to}
         onChange={(from, to) => setRange({ from, to })}
       />
+
+      <WeeklyVolumeChart weekly={weeklyVol} unit={unit} />
 
       {/* Aerobic development — driven by the date range above */}
       <AerobicScatter activities={inRange} unit={unit} />

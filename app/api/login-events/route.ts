@@ -32,6 +32,7 @@ export async function GET(request: Request) {
       ipAddress: e.ipAddress,
       userAgent: e.userAgent,
       country: e.country,
+      region: e.region,
       city: e.city,
     })),
     total,

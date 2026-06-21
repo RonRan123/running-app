@@ -4,7 +4,11 @@ import { format } from 'date-fns'
 import Link from 'next/link'
 import RouteMap, { type RoutePoint } from '@/components/RouteMap'
 import RunDetailStats from '@/components/RunDetailStats'
+import RunDeepDive from '@/components/deepdive/RunDeepDive'
 import { bestEfforts, type EffortActivity } from '@/lib/records'
+import { estimateMaxHr, trimp } from '@/lib/analysis'
+import { computeSplits, downsampleStreams, type RunStreams } from '@/lib/runAnalysis'
+import { KM_PER_MILE } from '@/lib/units'
 
 function asNumberArray(value: unknown): number[] | null {
   return Array.isArray(value) && value.every(v => typeof v === 'number')
@@ -59,11 +63,44 @@ export default async function RunDetailPage({
 }) {
   const { id } = await params
 
-  const activity = await prisma.activity.findUnique({ where: { id } })
+  const [activity, settings, allActivities] = await Promise.all([
+    prisma.activity.findUnique({ where: { id }, include: { stream: true } }),
+    prisma.userSettings.findUnique({ where: { id: 1 } }),
+    prisma.activity.findMany({
+      orderBy: { date: 'desc' },
+      select: { id: true, name: true, date: true, distance: true, duration: true, avgPace: true, avgHeartRate: true, maxHeartRate: true },
+    }),
+  ])
+
   if (!activity) notFound()
 
   const coordinates = parseCoordinates(activity.coordinates as unknown)
   const prLabels = await currentPrLabels(id)
+
+  // Build stream data for deep dive
+  let streams: RunStreams | null = null
+  if (activity.stream) {
+    const time = asNumberArray(activity.stream.time)
+    if (time) {
+      streams = {
+        time,
+        heartrate: asNumberArray(activity.stream.heartrate),
+        velocity: asNumberArray(activity.stream.velocity),
+        altitude: asNumberArray(activity.stream.altitude),
+        cadence: asNumberArray(activity.stream.cadence),
+        distance: asNumberArray(activity.stream.distance),
+      }
+    }
+  }
+
+  const analysisActivities = allActivities.map(a => ({ ...a, date: a.date.toISOString() }))
+  const maxHr = estimateMaxHr(analysisActivities)
+  const activityForTrimp = { ...activity, date: activity.date.toISOString(), avgPace: activity.avgPace, avgHeartRate: activity.avgHeartRate, maxHeartRate: activity.maxHeartRate, name: activity.name }
+  const runTrimp = activity.avgHeartRate ? trimp(activityForTrimp, maxHr) : null
+
+  const splitsMi = streams ? computeSplits(streams, KM_PER_MILE * 1000) : []
+  const splitsKm = streams ? computeSplits(streams, 1000) : []
+  const chartStreams = streams ? downsampleStreams(streams) : null
 
   return (
     <div className="space-y-6">
@@ -97,18 +134,9 @@ export default async function RunDetailPage({
             ))}
           </div>
         </div>
-        <Link
-          href={`/deep-dive?run=${activity.id}`}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-900 hover:text-zinc-600 transition-colors"
-        >
-          Deep dive
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
       </div>
 
-      {/* Stats grid — client component so it follows the stored mi/km preference */}
+      {/* Stats grid */}
       <RunDetailStats
         distance={activity.distance}
         duration={activity.duration}
@@ -126,6 +154,23 @@ export default async function RunDetailPage({
           <RouteMap coordinates={coordinates} />
         </div>
       ) : null}
+
+      {/* Deep Dive */}
+      <RunDeepDive
+        activity={{
+          distance: activity.distance,
+          duration: activity.duration,
+          avgPace: activity.avgPace,
+          avgHeartRate: activity.avgHeartRate,
+          maxHeartRate: activity.maxHeartRate,
+        }}
+        streams={chartStreams}
+        splitsMi={splitsMi}
+        splitsKm={splitsKm}
+        trimp={runTrimp}
+        maxHr={maxHr}
+        initialAge={settings?.age ?? null}
+      />
     </div>
   )
 }

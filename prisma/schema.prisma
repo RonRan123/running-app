@@ -60,5 +60,6 @@ model LoginEvent {
   ipAddress String?
   userAgent String?
   country   String?
+  region    String?
   city      String?
 }
