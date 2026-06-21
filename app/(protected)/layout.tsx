@@ -1,8 +1,8 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import SignOutButton from '@/components/SignOutButton'
+import NavBar from '@/components/NavBar'
+import BottomNav from '@/components/BottomNav'
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -10,32 +10,12 @@ export default async function ProtectedLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <header className="bg-white border-b border-zinc-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <span className="font-semibold text-zinc-900 tracking-tight">Running Dashboard</span>
-            <nav className="flex items-center gap-4 text-sm">
-              <Link href="/runs" className="text-zinc-500 hover:text-zinc-900 transition-colors">
-                Runs
-              </Link>
-              <Link href="/runs/heatmap" className="text-zinc-500 hover:text-zinc-900 transition-colors">
-                Heatmap
-              </Link>
-              <Link href="/analysis" className="text-zinc-500 hover:text-zinc-900 transition-colors">
-                Analysis
-              </Link>
-              <Link href="/deep-dive" className="text-zinc-500 hover:text-zinc-900 transition-colors">
-                Deep Dive
-              </Link>
-              <Link href="/goals" className="text-zinc-500 hover:text-zinc-900 transition-colors">
-                Goals
-              </Link>
-            </nav>
-          </div>
-          <SignOutButton />
-        </div>
-      </header>
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">{children}</main>
+      <NavBar />
+      {/* Extra bottom padding on mobile so content clears the bottom nav bar */}
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 md:py-8 pb-24 md:pb-8">
+        {children}
+      </main>
+      <BottomNav />
     </div>
   )
 }

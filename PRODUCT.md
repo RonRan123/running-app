@@ -222,6 +222,39 @@ The deep insight: a scatter plot of HR over time is motivating, but nothing beat
 
 ---
 
+### Wave 10 — Login Auditing, Settings Tab & Mobile Polish
+> Goal: Harden the app's security posture with login audit logging, give the user a Settings home for account-level controls, and make the UI genuinely usable on a phone.
+
+**Login Audit Logging**
+- [ ] New `LoginEvent` table in Prisma schema: `id`, `userId`, `timestamp` (UTC), `ipAddress`, `userAgent`, `country` (geo-resolved from IP via a lightweight lookup, nullable), `city` (nullable)
+- [ ] On every successful NextAuth `signIn` event, insert a `LoginEvent` row — fire-and-forget, never blocks login
+- [ ] IP is read from the `x-forwarded-for` header (Vercel sets this); fall back to the direct socket address
+- [ ] Geo-resolution uses a local MaxMind GeoLite2 City database (no external request per login — fast and offline-safe)
+
+**Settings Tab**
+- [ ] New `/settings` route with "Settings" added to the main nav
+- [ ] Page sections: **Account** (display name, email — read-only for now), **Security** (login history panel)
+- [ ] "Show Login History" toggle button expands an inline table: columns for Date & Time, Location (City, Country), IP Address, and Device (parsed from User-Agent — e.g. "Chrome on macOS")
+- [ ] Table is paginated at 10 rows per page, newest-first; empty state if no events yet
+- [ ] Login events older than 90 days are automatically pruned by a lightweight cleanup triggered on page load (async, non-blocking)
+
+**Mobile-Friendly Polish**
+The goal is a smooth one-thumb experience on a 390 px screen — not a stripped-down version, but a layout that reorganises for the smaller canvas.
+
+- [ ] **Hamburger nav**: on `sm` breakpoint and below, collapse the top nav into a slide-in drawer triggered by a hamburger icon (☰); the drawer overlays the page with a semi-transparent backdrop, closes on outside tap or the ✕ button, and lists all nav links in a large, finger-friendly list (min 48 px tap target per link)
+- [ ] **Touch targets**: audit all interactive elements (buttons, links, chart dots, table rows) and enforce a minimum 44 × 44 px tap area — add padding where needed without altering visual size
+- [ ] **Responsive typography**: switch heading sizes from fixed `text-2xl/3xl` to fluid Tailwind clamp steps (`text-xl md:text-3xl`) so copy never overflows on narrow screens
+- [ ] **Card stacking**: all two-column stat cards (dashboard, goals, PRs) collapse to a single-column stack below `md`; maintain the same visual hierarchy, just vertical
+- [ ] **Chart interactions**: replace hover-only tooltips with tap-to-show tooltips on Recharts and Mapbox layers — mobile browsers do not reliably fire `mouseover` events
+- [ ] **Sticky bottom bar (mobile only)**: on `sm` and below, render a fixed bottom bar with icon shortcuts to Dashboard, Runs, Analysis, and Settings — mirrors the pattern of every major fitness app and keeps key navigation reachable with one thumb; hides on `md+` where the top nav is visible
+- [ ] **Table scroll**: run list and segment effort tables wrap in a horizontally scrollable container on mobile so columns are never truncated; add a subtle `overflow-x: auto` shadow cue to signal scrollability
+- [ ] **Upload UX**: the drag-and-drop GPX/FIT upload zone falls back to a large "Tap to select file" button on touch devices (drag-and-drop is unusable on mobile)
+- [ ] **Viewport & font-size**: confirm `<meta name="viewport" content="width=device-width, initial-scale=1">` is set and that no element forces a horizontal scrollbar on a 390 px canvas
+
+- [ ] **Test**: Login events appear in the Settings table immediately after signing in; geo fields populate correctly for a known IP; pruning removes events > 90 days on Settings page load; hamburger drawer opens and closes correctly on a 390 px viewport; bottom bar is visible on mobile and hidden on desktop; all charts respond to tap tooltips; no horizontal overflow on iPhone SE (375 px) in Chrome DevTools
+
+---
+
 ## Rules for Building
 
 1. Complete one wave fully before starting the next.
