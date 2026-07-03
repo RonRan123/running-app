@@ -296,6 +296,80 @@ Below all existing analysis charts, add a stacked bar chart that shows how many 
 
 ---
 
+### Wave 12 — Weather Overlay, Demo Account, Landing Copy & Heatmap Range
+> Goal: Bring an external data source (weather) into the training-load story, make the app shareable via a sandboxed demo login, refresh the landing page copy, and let the heatmap be scoped to a date range instead of always showing everything.
+
+**Landing Page Copy**
+- [ ] `app/page.tsx` hero headline changes from "Track Every Mile. Own Every Run." to **"Track every run. Log every step and beat."**
+- [ ] Subhead changes to **"Your personal running trainer. Visualize each run, analyze your training load, and reach your goals"**
+- [ ] No layout/structural changes — copy swap only
+
+**Weather Overlay (Open-Meteo)**
+
+Field selection is driven by what actually predicts performance degradation, not just what's easy to show. Plain relative humidity and a hand-rolled heat index are both weaker signals than what's available directly from the API for free:
+
+- [ ] Three new nullable columns directly on `Activity` (no joined table — this is genuinely "bare minimum, alongside the run data"): `weatherTempC Float?`, `weatherDewPointC Float?`, `weatherApparentTempC Float?`
+- [ ] A fourth column, `weatherFetchedAt DateTime?`, records when a fetch was *attempted* (success or definitive failure) — this is the field that makes the "only call the API for runs that don't have it yet" requirement work: any backfill/sync job filters on `WHERE weatherFetchedAt IS NULL` before calling out, so already-processed runs (and runs already known to be unfetchable, e.g. missing GPS) are never re-queried
+- [ ] Source: [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api), hourly `temperature_2m`, `dew_point_2m`, `apparent_temperature` — no API key required
+  - `dew_point_2m` is stored instead of relative humidity: dew point is an absolute moisture measure and a better predictor of how much sweat evaporation (the runner's actual cooling mechanism) is being blunted, whereas relative humidity is temperature-relative and reads misleadingly across different temps
+  - `apparent_temperature` is stored instead of computing our own heat index: Open-Meteo's version already folds in wind and solar radiation on top of humidity, which is a more complete heat-stress read for someone generating heavy metabolic heat than the NWS heat-index formula (built for a resting person in shade) — and it means no server-side formula to write or maintain
+- [ ] For each run needing weather, use its GPS start coordinate (or centroid if no GPS) plus its date/time window; average the hourly points spanning the run's start→end, or take the single point nearest the run's midpoint for runs under ~2 hours — pick one approach and document it in the sync code
+- [ ] Fetched on sync (Intervals.icu) and on GPX/FIT upload, same fire-and-forget pattern used for geo-resolution in `lib/auth.ts`; a failed/unreachable call still stamps `weatherFetchedAt` so it isn't retried on every future sync, but leaves the three data columns null
+- [ ] Run detail page (and Deep Dive section) shows a small weather badge: temp, dew point, "feels like" — with unit-aware formatting (°F/°C matching the existing mi/km unit preference)
+
+**Demo Account**
+
+The demo login sees real data but only a configurable date window set by the admin, and has no ability to change anything. Decided approach: a centralized data-access layer — see rationale below.
+
+*Credentials & auth*
+- [ ] New `hello@ronithranjan.com` / `ILoveRunning23` credential, distinct from the existing single-admin login in `lib/auth.ts` (`ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH`) — `authorize()` gains a second branch checked against new `DEMO_EMAIL` / `DEMO_PASSWORD_HASH` env vars
+- [ ] NextAuth `jwt`/`session` callbacks stamp `isDemo: boolean` onto the session (no callbacks exist today — this wave adds them), so every server component and route handler can check `session.isDemo` via `getServerSession(authOptions)`
+- [ ] Demo session must not trigger real Intervals.icu/Strava/Garmin syncs
+- [ ] Do not store credentials in the README or anywhere publicly visible — share only directly
+
+*Admin-configurable date window (Settings page)*
+- [ ] Add two new nullable columns to the existing single-row `UserSettings` model: `demoFromDate DateTime?` and `demoToDate DateTime?` — these live in the same table as `age`, no new model needed; default (null) falls back to January 1 – March 31, 2026 hardcoded in `lib/activities.ts`
+- [ ] `app/api/settings/route.ts` `GET` and `PUT` handlers extended to read/write `demoFromDate` and `demoToDate` alongside the existing `age` field; the `PUT` validates that both are valid dates and that `from` is before `to`
+- [ ] Settings page (`app/(protected)/settings/page.tsx`) gains a new **Demo Access** section, visible **only when the admin is logged in** (`session.isDemo` is false and the user email matches `ADMIN_EMAIL`) — the section shows the currently configured date range and two date-picker inputs (start / end) with a Save button; saving calls `PUT /api/settings`; the section is not rendered for the demo session at all (blocked as a write path anyway)
+
+*Data access layer*
+- [ ] New `lib/activities.ts` — the one place that knows about the date restriction. On every call it reads `demoFromDate`/`demoToDate` from `UserSettings` (falling back to Jan 1 – Mar 31, 2026 if null) and merges `{ date: { gte: fromDate, lte: toDate } }` into the Prisma `where` clause whenever `session.isDemo` is true; passes through unfiltered for the admin
+- [ ] Refactor the existing **read** call sites to go through `lib/activities.ts` instead of calling `prisma.activity` directly: `app/(protected)/analysis/page.tsx`, `app/(protected)/goals/page.tsx`, `app/(protected)/runs/page.tsx`, `app/(protected)/runs/[id]/page.tsx`, `app/api/activities/route.ts`, `app/api/activities/geo/route.ts`
+- [ ] `getActivityById` must include the date bound in its `WHERE`, not check it after the fact — so a demo user cannot see an out-of-range run by typing its ID into `/runs/[id]` directly; it returns the same "not found" as a nonexistent ID
+- [ ] All **write** paths (`app/api/activities/upload/route.ts`, sync, goal CRUD, settings mutations) return 403 for `session.isDemo` — read-only is a separate axis from the date restriction
+
+*Why this method, not the alternatives considered:* filtering ad hoc at each of the 6+ read call sites was ruled out because nothing stops a future route from forgetting the check. An ORM-level filter (Prisma Client Extension + `AsyncLocalStorage`) was ruled out as disproportionate for a personal app — nothing in the codebase uses that pattern today, it doesn't cover raw SQL escapes, and it makes the restriction invisible in the code that uses it. The centralized-helper approach gets the same practical guarantee with no extra machinery.
+
+**Heatmap Date Range**
+- [ ] `/runs/heatmap` defaults to showing all runs (current behavior), but adds the same dual-handle `DateRangeSlider` component used on `/analysis`
+- [ ] Selecting a range filters which GPS tracks render on the heatmap layer; clearing/resetting returns to all-time
+- [ ] Slider domain bounds are the user's earliest → latest run, same pattern as `AnalysisView`
+
+**"How to Use" Page**
+
+A single explanatory page that gives any user — including the demo account — enough context to understand what they're looking at and what to do with it. Sits between Goals and Settings in the nav.
+
+- [ ] New `/how-to-use` route (`app/(protected)/how-to-use/page.tsx`) added to the main nav between Goals and Settings
+- [ ] Page is purely static/server-rendered — no data fetching, no interactivity, no charts
+- [ ] Content is structured in three parts:
+  1. **Overview** — what RUNNA is and the philosophy behind it: train by feel + data, build aerobic base first, protect yourself from injury through load awareness
+  2. **Page-by-page guide** — one section per nav item (Dashboard, Runs, Heatmap, Analysis, Goals, Deep Dive within Runs) explaining what each page shows and what action it implies
+  3. **Analysis deep dive** — a longer section covering every chart on the Analysis page in plain language: what it measures, how it's calculated, what a good vs. concerning trend looks like, and what to do about it — specifically covering Weekly Volume, Aerobic Development scatter, Aerobic Efficiency, Aerobic Pace (Zone 2), Effort Distribution, Fitness & Fatigue (CTL/ATL/TSB with the TRIMP formula explained), Acute:Chronic Load Ratio, and Long Run Progression
+- [ ] Writing tone: plain English, no assumed running-science knowledge — explain what "Zone 2", "TRIMP", "CTL", "dew point" etc. mean inline rather than treating them as known terms
+- [ ] No external links, no dynamic content — the page must render instantly and work for both the admin and demo sessions
+
+- [ ] **Test**: page loads without auth errors for both admin and demo sessions; all nav links on the page are correct; content renders cleanly on mobile (390 px) with no horizontal overflow
+
+**Analysis: Performance vs. Weather**
+- [ ] New chart on `/analysis`: run performance (aerobic efficiency factor or Zone-2 pace, consistent with existing Wave 5 metrics) plotted against `weatherApparentTempC`, to surface how heat stress degrades pace-per-effort — apparent temperature is used as the x-axis (not raw temp) since it's the single field that already accounts for humidity, wind, and solar load
+- [ ] Scatter plot, one dot per run with weather data: x-axis = apparent temperature, y-axis = efficiency factor (or pace), dot color encoding dew point as a secondary moisture signal
+- [ ] Respects the page's existing date range control and mi/km ↔ °F/°C unit preference
+- [ ] Only includes runs where `weatherFetchedAt` succeeded (data columns non-null); empty state if fewer than a handful of qualifying runs exist yet (expected immediately after this wave ships, before the backfill job has caught up on older runs)
+
+- [ ] **Test**: landing page renders the new headline/subhead with no layout breakage; a newly synced/uploaded run gets `weatherTempC`/`weatherDewPointC`/`weatherApparentTempC` populated and `weatherFetchedAt` stamped; re-running sync does not re-call Open-Meteo for runs that already have `weatherFetchedAt` set; a run with unreachable Open-Meteo still gets `weatherFetchedAt` stamped (with null data columns) so it isn't retried; demo login succeeds and sees only runs within the admin-configured date window on the runs list, analysis charts, and heatmap; directly visiting `/runs/[id]` for an out-of-window run returns not-found for the demo session but loads correctly for the admin; demo session gets 403 on upload/sync/goal-CRUD/settings-mutation endpoints; admin Settings page shows the Demo Access section with the current from/to dates, saving a new range updates `UserSettings`, and the demo session immediately sees only that new window; admin session is completely unaffected by the date restriction; Settings Demo Access section is invisible when the demo account is logged in; heatmap slider narrows rendered tracks within the demo window; weather-vs-performance chart plots correctly against apparent temperature and updates with the date range slider
+
+---
+
 ## Rules for Building
 
 1. Complete one wave fully before starting the next.
