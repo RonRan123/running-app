@@ -8,6 +8,10 @@ const PRUNE_DAYS = 90
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  // Login history includes the admin's IPs and locations — not for demo eyes.
+  if (session.isDemo) {
+    return Response.json({ error: 'Not available for the demo account' }, { status: 403 })
+  }
 
   const { searchParams } = new URL(request.url)
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))

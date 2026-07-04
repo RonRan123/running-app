@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { fetchActivities, fetchGpsStream, fetchStreams } from '@/lib/intervals'
 import type { ActivityStreams } from '@/lib/intervals'
 import type { Prisma } from '@prisma/client'
+import { backfillWeather } from '@/lib/weather'
 
 const RUN_TYPES = new Set(['Run', 'VirtualRun', 'TrailRun', 'Treadmill'])
 
@@ -137,6 +138,10 @@ export async function runSync(oldest: Date): Promise<SyncResult> {
     }
     await sleep(FETCH_DELAY_MS)
   }
+
+  // Fire-and-forget: pull Open-Meteo weather for any run that hasn't been
+  // attempted yet (newly synced ones included). Never blocks the sync result.
+  void backfillWeather()
 
   return { synced, skipped, gpsAdded, streamsAdded, total: runs.length }
 }

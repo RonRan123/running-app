@@ -29,10 +29,10 @@ export default function Home() {
 
       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-6">
         <h1 className="text-6xl font-extrabold text-white tracking-tight leading-tight mb-5">
-          Track Every Mile.<br />Own Every Run.
+          Track every run.<br />Log every step and beat.
         </h1>
         <p className="text-lg text-white/75 max-w-md mb-10 leading-relaxed">
-          Your personal running command center. Sync workouts from Intervals.icu, analyze your training load, and visualize every route on an interactive map.
+          Your personal running trainer. Visualize each run, analyze your training load, and reach your goals
         </p>
         <Link
           href="/login"

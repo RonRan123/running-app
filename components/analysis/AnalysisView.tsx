@@ -21,6 +21,7 @@ import WeeklyVolumeChart from './WeeklyVolumeChart'
 import FitnessFatigue from './FitnessFatigue'
 import LoadRatioCard from './LoadRatioCard'
 import LongRunProgression from './LongRunProgression'
+import WeatherPerformance from './WeatherPerformance'
 import Zone2PaceTrend from './Zone2PaceTrend'
 
 export default function AnalysisView({ activities }: { activities: AnalysisActivity[] }) {
@@ -87,6 +88,7 @@ export default function AnalysisView({ activities }: { activities: AnalysisActiv
         <Zone2PaceTrend activities={inRange} maxHr={maxHr} unit={unit} />
       </div>
       <ZoneDistribution weekly={weeklyZones} />
+      <WeatherPerformance activities={inRange} unit={unit} />
 
       {/* Training load — fixed windows, independent of the slider */}
       <div>

@@ -47,11 +47,25 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null
-        if (credentials.email !== process.env.ADMIN_EMAIL) return null
-        const hash = process.env.ADMIN_PASSWORD_HASH
-        if (!hash) return null
-        const valid = await bcrypt.compare(credentials.password, hash)
-        if (!valid) return null
+
+        // Two fixed accounts: the real admin, and a read-only demo login
+        // whose data visibility is restricted in lib/activities.ts.
+        let user: { id: string; name: string; isDemo: boolean } | null = null
+        if (credentials.email === process.env.ADMIN_EMAIL) {
+          const hash = process.env.ADMIN_PASSWORD_HASH
+          if (hash && (await bcrypt.compare(credentials.password, hash))) {
+            user = { id: '1', name: 'Admin', isDemo: false }
+          }
+        } else if (
+          process.env.DEMO_EMAIL &&
+          credentials.email === process.env.DEMO_EMAIL
+        ) {
+          const hash = process.env.DEMO_PASSWORD_HASH
+          if (hash && (await bcrypt.compare(credentials.password, hash))) {
+            user = { id: 'demo', name: 'Demo', isDemo: true }
+          }
+        }
+        if (!user) return null
 
         // Fire-and-forget login event — never blocks auth
         const headers = req?.headers as Record<string, string | string[]> | undefined
@@ -60,16 +74,29 @@ export const authOptions: NextAuthOptions = {
         const userAgent = (headers?.['user-agent'] as string | undefined) ?? null
         resolveGeoAndRecord(ip, userAgent)
 
-        return { id: '1', email: credentials.email, name: 'Admin' }
+        return { ...user, email: credentials.email }
       },
     }),
   ],
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
+  callbacks: {
+    async jwt({ token, user }) {
+      // `user` is only present on initial sign-in; persist the demo flag.
+      if (user) token.isDemo = user.isDemo ?? false
+      return token
+    },
+    async session({ session, token }) {
+      session.isDemo = token.isDemo ?? false
+      return session
+    },
+  },
   events: {
     // Fire-and-forget: pull recent runs from Intervals.icu on every login.
     // Deliberately not awaited so login is never blocked by a slow sync.
-    async signIn() {
+    // Demo logins never trigger a sync.
+    async signIn({ user }) {
+      if (user?.isDemo) return
       if (!intervalsConfigured()) return
       const oldest = new Date(Date.now() - AUTO_SYNC_WINDOW_DAYS * 24 * 60 * 60 * 1000)
       runSync(oldest).catch(err => {

@@ -13,6 +13,11 @@ export interface AnalysisActivity {
   avgPace: number | null // min/km
   avgHeartRate: number | null
   maxHeartRate: number | null
+  // Weather at run time (Open-Meteo backfill) — optional so callers that
+  // don't select the columns still satisfy the interface.
+  weatherTempC?: number | null
+  weatherDewPointC?: number | null
+  weatherApparentTempC?: number | null
 }
 
 // Assumed resting HR for TRIMP — not collected anywhere in the app.

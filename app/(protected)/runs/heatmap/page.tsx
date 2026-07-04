@@ -24,9 +24,7 @@ export default function HeatmapPage() {
         </Link>
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 overflow-hidden h-[calc(100vh-14rem)] min-h-[400px]">
-        <HeatmapMap />
-      </div>
+      <HeatmapMap />
     </div>
   )
 }

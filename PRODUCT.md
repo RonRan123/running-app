@@ -339,7 +339,7 @@ The demo login sees real data but only a configurable date window set by the adm
 - [ ] All **write** paths (`app/api/activities/upload/route.ts`, sync, goal CRUD, settings mutations) return 403 for `session.isDemo` — read-only is a separate axis from the date restriction
 
 *Why this method, not the alternatives considered:* filtering ad hoc at each of the 6+ read call sites was ruled out because nothing stops a future route from forgetting the check. An ORM-level filter (Prisma Client Extension + `AsyncLocalStorage`) was ruled out as disproportionate for a personal app — nothing in the codebase uses that pattern today, it doesn't cover raw SQL escapes, and it makes the restriction invisible in the code that uses it. The centralized-helper approach gets the same practical guarantee with no extra machinery.
-
+`
 **Heatmap Date Range**
 - [ ] `/runs/heatmap` defaults to showing all runs (current behavior), but adds the same dual-handle `DateRangeSlider` component used on `/analysis`
 - [ ] Selecting a range filters which GPS tracks render on the heatmap layer; clearing/resetting returns to all-time

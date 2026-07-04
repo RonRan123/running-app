@@ -10,6 +10,7 @@ const navLinks = [
   { href: '/runs/heatmap', label: 'Heatmap', exact: false },
   { href: '/analysis', label: 'Analysis', exact: false },
   { href: '/goals', label: 'Goals', exact: false },
+  { href: '/how-to-use', label: 'How to Use', exact: false },
   { href: '/settings', label: 'Settings', exact: false },
 ]
 

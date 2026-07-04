@@ -3,10 +3,14 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseGpx } from '@/lib/parsers/gpx'
 import { parseFit } from '@/lib/parsers/fit'
+import { backfillWeather } from '@/lib/weather'
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  if (session.isDemo) {
+    return Response.json({ error: 'Demo account is read-only' }, { status: 403 })
+  }
 
   const formData = await request.formData()
   const files = formData.getAll('files') as File[]
@@ -67,6 +71,9 @@ export async function POST(request: Request) {
       results.push({ name: file.name, success: false, error: message })
     }
   }
+
+  // Fire-and-forget weather fetch for the newly uploaded runs.
+  if (results.some(r => r.success)) void backfillWeather()
 
   const allOk = results.every(r => r.success)
   return Response.json({ results }, { status: allOk ? 200 : 207 })
