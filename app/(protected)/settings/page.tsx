@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import LoginHistory from '@/components/settings/LoginHistory'
 import DemoAccess from '@/components/settings/DemoAccess'
+import AgeSetting from '@/components/settings/AgeSetting'
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions)
@@ -31,6 +32,18 @@ export default async function SettingsPage() {
           </span>
         </div>
       </section>
+
+      {/* Training section — age drives the MAF band on run heart rate charts */}
+      {isAdmin && (
+        <section className="bg-white rounded-2xl border border-zinc-200 divide-y divide-zinc-100">
+          <div className="px-5 py-4">
+            <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wide text-xs">Training</h2>
+          </div>
+          <div className="px-5 py-5">
+            <AgeSetting />
+          </div>
+        </section>
+      )}
 
       {/* Security section — login history contains the admin's IPs/locations */}
       {isAdmin && (

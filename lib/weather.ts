@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { differenceInDays, format } from 'date-fns'
+import { differenceInDays } from 'date-fns'
 
 // Weather-at-run-time via the Open-Meteo historical archive (no API key).
 //
@@ -56,12 +56,14 @@ export async function fetchRunWeather(
   const params = new URLSearchParams({
     latitude: coord.lat.toFixed(4),
     longitude: coord.lng.toFixed(4),
-    start_date: format(start, 'yyyy-MM-dd'),
-    end_date: format(end, 'yyyy-MM-dd'),
+    // UTC calendar days, matching timezone=UTC below.
+    start_date: start.toISOString().slice(0, 10),
+    end_date: end.toISOString().slice(0, 10),
     hourly: HOURLY_VARS,
-    // Activity dates are stored as local wall-clock time, so ask Open-Meteo
-    // for the coordinate's local timezone to compare hours apples-to-apples.
-    timezone: 'auto',
+    // Activity dates are true UTC instants, so ask for epoch timestamps and
+    // compare instants directly — no string parsing, no server-TZ dependence.
+    timeformat: 'unixtime',
+    timezone: 'UTC',
   })
 
   const res = await fetch(`https://archive-api.open-meteo.com/v1/archive?${params}`, {
@@ -71,7 +73,7 @@ export async function fetchRunWeather(
 
   const data = (await res.json()) as {
     hourly?: {
-      time: string[]
+      time: number[] // epoch seconds
       temperature_2m: (number | null)[]
       dew_point_2m: (number | null)[]
       apparent_temperature: (number | null)[]
@@ -80,16 +82,18 @@ export async function fetchRunWeather(
   const hourly = data.hourly
   if (!hourly?.time?.length) return null
 
-  // Collect hourly samples overlapping [start, end], padded a half hour on
-  // each side so a 07:20–08:10 run picks up both the 07:00 and 08:00 rows.
-  const windowFrom = start.getTime() - 30 * 60 * 1000
-  const windowTo = end.getTime() + 30 * 60 * 1000
+  // Collect the hourly samples that bracket the run: from the top of the
+  // start hour through the top of the hour after the end. A 14:30–15:30 run
+  // averages the 14:00, 15:00, and 16:00 samples — no knife-edge cutoffs.
+  const HOUR = 60 * 60 * 1000
+  const windowFrom = Math.floor(start.getTime() / HOUR) * HOUR
+  const windowTo = Math.ceil(end.getTime() / HOUR) * HOUR
 
   const temps: number[] = []
   const dews: number[] = []
   const feels: number[] = []
   for (let i = 0; i < hourly.time.length; i++) {
-    const t = new Date(hourly.time[i]).getTime()
+    const t = hourly.time[i] * 1000
     if (t < windowFrom || t > windowTo) continue
     const temp = hourly.temperature_2m[i]
     const dew = hourly.dew_point_2m[i]

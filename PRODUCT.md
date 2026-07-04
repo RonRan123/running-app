@@ -368,6 +368,12 @@ A single explanatory page that gives any user — including the demo account —
 
 - [ ] **Test**: landing page renders the new headline/subhead with no layout breakage; a newly synced/uploaded run gets `weatherTempC`/`weatherDewPointC`/`weatherApparentTempC` populated and `weatherFetchedAt` stamped; re-running sync does not re-call Open-Meteo for runs that already have `weatherFetchedAt` set; a run with unreachable Open-Meteo still gets `weatherFetchedAt` stamped (with null data columns) so it isn't retried; demo login succeeds and sees only runs within the admin-configured date window on the runs list, analysis charts, and heatmap; directly visiting `/runs/[id]` for an out-of-window run returns not-found for the demo session but loads correctly for the admin; demo session gets 403 on upload/sync/goal-CRUD/settings-mutation endpoints; admin Settings page shows the Demo Access section with the current from/to dates, saving a new range updates `UserSettings`, and the demo session immediately sees only that new window; admin session is completely unaffected by the date restriction; Settings Demo Access section is invisible when the demo account is logged in; heatmap slider narrows rendered tracks within the demo window; weather-vs-performance chart plots correctly against apparent temperature and updates with the date range slider
 
+**Post-wave fixes (2026-07-04)**
+- Timezone bug: sync stored `start_date_local` parsed in the server's TZ — on Vercel (UTC) every run timestamp landed 4 h early, making the weather fetch read the wrong hours. Sync now stores `start_date` (true UTC); weather queries use `timeformat=unixtime` so hour-matching is TZ-independent. All 104 existing activity dates repaired from the Intervals.icu API and weather re-backfilled.
+- Weather sampling now averages the hourly samples bracketing the run (top of start hour → top of hour after end) instead of a ±30 min pad with knife-edge cutoffs.
+- Age moved to Settings → Training (drives the MAF band on run HR charts); inline MAF editor removed from the run deep dive, replaced with a link to Settings when age is unset.
+- Removed the orphaned `/deep-dive` route and `DeepDiveView` left over from Wave 11.
+
 ---
 
 ## Rules for Building

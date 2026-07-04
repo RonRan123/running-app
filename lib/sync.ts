@@ -117,7 +117,11 @@ export async function runSync(oldest: Date): Promise<SyncResult> {
     const created = await prisma.activity.create({
       data: {
         name: a.name || a.type,
-        date: new Date(a.start_date_local),
+        // start_date is the true UTC instant. Never parse start_date_local —
+        // it has no offset, so new Date() reads it in the *server's* timezone
+        // and stores a wrong instant when the server isn't in the run's TZ
+        // (e.g. Vercel runs in UTC).
+        date: new Date(a.start_date),
         distance: Math.round(distanceKm * 1000) / 1000,
         duration: a.elapsed_time,
         avgPace,

@@ -3,7 +3,8 @@ const BASE = 'https://intervals.icu/api/v1'
 export interface IntervalsActivity {
   id: string
   name: string
-  start_date_local: string // ISO datetime
+  start_date_local: string // ISO datetime, no offset — server-TZ-dependent to parse
+  start_date: string // ISO datetime with Z — the true UTC instant
   type: string
   distance: number        // meters
   elapsed_time: number    // seconds
