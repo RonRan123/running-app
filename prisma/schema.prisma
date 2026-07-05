@@ -22,6 +22,14 @@ model Activity {
   externalId   String?         @unique
   createdAt    DateTime        @default(now())
   stream       ActivityStream?
+
+  // Weather at run time (Open-Meteo historical archive). weatherFetchedAt is
+  // stamped on every fetch *attempt* — success or definitive failure — so
+  // backfill only ever queries runs where it is null.
+  weatherTempC         Float?
+  weatherDewPointC     Float?
+  weatherApparentTempC Float?
+  weatherFetchedAt     DateTime?
 }
 
 // Raw per-sample time-series for a run. Each Json column is a number[]
@@ -43,6 +51,11 @@ model ActivityStream {
 model UserSettings {
   id  Int  @id @default(1)
   age Int?
+
+  // Date window the demo account is allowed to see. Null = fall back to the
+  // default window hardcoded in lib/activities.ts.
+  demoFromDate DateTime?
+  demoToDate   DateTime?
 }
 
 model RaceGoal {

@@ -13,6 +13,9 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  if (session.isDemo) {
+    return Response.json({ error: 'Demo account is read-only' }, { status: 403 })
+  }
 
   const body = await request.json().catch(() => null)
   const name = typeof body?.name === 'string' ? body.name.trim() : ''

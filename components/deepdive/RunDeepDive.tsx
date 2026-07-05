@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import Link from 'next/link'
 import UnitToggle from '@/components/UnitToggle'
 import { useUnit } from '@/lib/useUnit'
 import { formatDistance, formatDuration, formatPace } from '@/lib/units'
@@ -10,7 +11,6 @@ import PaceChart from './PaceChart'
 import ElevationChart from './ElevationChart'
 import SplitsTable from './SplitsTable'
 import ZoneBar from './ZoneBar'
-import MafSettings from './MafSettings'
 
 export interface RunDeepDiveActivity {
   distance: number  // km
@@ -38,9 +38,9 @@ export default function RunDeepDive({
   initialAge: number | null
 }) {
   const { unit, changeUnit } = useUnit()
-  const [age, setAge] = useState(initialAge)
 
-  const maf = age != null ? mafTarget(age) : null
+  // Age is configured once in Settings → Training; 180 − age is the MAF band.
+  const maf = initialAge != null ? mafTarget(initialAge) : null
 
   const zones = useMemo(
     () => streams?.heartrate ? timeInZones(streams.time, streams.heartrate, maxHr) : null,
@@ -77,7 +77,15 @@ export default function RunDeepDive({
         ))}
       </div>
 
-      <MafSettings age={age} onSaved={setAge} />
+      {maf === null && streams?.heartrate ? (
+        <p className="text-xs text-zinc-500">
+          Set your age in{' '}
+          <Link href="/settings" className="underline hover:text-zinc-900">
+            Settings
+          </Link>{' '}
+          to draw the Maffetone (180 − age) target band on the heart rate chart.
+        </p>
+      ) : null}
 
       {streams ? (
         <>

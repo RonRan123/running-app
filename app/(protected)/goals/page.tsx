@@ -1,4 +1,7 @@
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { findActivities } from '@/lib/activities'
 import { bestEfforts, predictRaceTime, type EffortActivity } from '@/lib/records'
 import GoalsView from '@/components/goals/GoalsView'
 
@@ -9,9 +12,10 @@ function asNumberArray(value: unknown): number[] | null {
 }
 
 export default async function GoalsPage() {
+  const session = await getServerSession(authOptions)
   const [goals, activities] = await Promise.all([
     prisma.raceGoal.findMany({ orderBy: { date: 'asc' } }),
-    prisma.activity.findMany({
+    findActivities(session, {
       orderBy: { date: 'asc' },
       select: {
         id: true,

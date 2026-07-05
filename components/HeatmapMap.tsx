@@ -1,11 +1,19 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import type { Map as MapboxMap } from 'mapbox-gl'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { Map as MapboxMap, GeoJSONSource } from 'mapbox-gl'
+import { endOfDay, startOfDay } from 'date-fns'
+import DateRangeSlider from '@/components/DateRangeSlider'
 
 interface GeoActivity {
   id: string
+  date: string
   coordinates: { lat: number; lng: number }[]
+}
+
+interface Track {
+  ts: number
+  coordinates: [number, number][]
 }
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
@@ -14,11 +22,41 @@ function hasToken() {
   return Boolean(TOKEN && TOKEN !== 'your_mapbox_token_here')
 }
 
+function toFeatureCollection(tracks: Track[]) {
+  return {
+    type: 'FeatureCollection' as const,
+    features: tracks.map(t => ({
+      type: 'Feature' as const,
+      properties: {},
+      geometry: { type: 'LineString' as const, coordinates: t.coordinates },
+    })),
+  }
+}
+
 export default function HeatmapMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapboxMap | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
   const [message, setMessage] = useState<string | null>(null)
+  const [tracks, setTracks] = useState<Track[]>([])
+  // null = all-time (the default view)
+  const [range, setRange] = useState<{ from: Date; to: Date } | null>(null)
+
+  const domain = useMemo(() => {
+    if (tracks.length === 0) return null
+    const times = tracks.map(t => t.ts)
+    return {
+      min: startOfDay(new Date(Math.min(...times))),
+      max: startOfDay(new Date(Math.max(...times))),
+    }
+  }, [tracks])
+
+  const visibleTracks = useMemo(() => {
+    if (!range) return tracks
+    const from = startOfDay(range.from).getTime()
+    const to = endOfDay(range.to).getTime()
+    return tracks.filter(t => t.ts >= from && t.ts <= to)
+  }, [tracks, range])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -36,18 +74,20 @@ export default function HeatmapMap() {
       const activities: GeoActivity[] = await res.json()
       if (cancelled || !containerRef.current) return
 
-      const tracks = activities
-        .map(a =>
-          (a.coordinates ?? [])
+      const loaded: Track[] = activities
+        .map(a => ({
+          ts: new Date(a.date).getTime(),
+          coordinates: (a.coordinates ?? [])
             .filter(p => typeof p?.lat === 'number' && typeof p?.lng === 'number')
             .map(p => [p.lng, p.lat] as [number, number]),
-        )
-        .filter(t => t.length > 1)
+        }))
+        .filter(t => t.coordinates.length > 1)
 
-      if (tracks.length === 0) {
+      if (loaded.length === 0) {
         setStatus('empty')
         return
       }
+      setTracks(loaded)
 
       const mapboxgl = (await import('mapbox-gl')).default
       if (cancelled || !containerRef.current) return
@@ -78,14 +118,7 @@ export default function HeatmapMap() {
 
         map.addSource('tracks', {
           type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: tracks.map(coordinates => ({
-              type: 'Feature' as const,
-              properties: {},
-              geometry: { type: 'LineString' as const, coordinates },
-            })),
-          },
+          data: toFeatureCollection(loaded),
         })
 
         // Wide, faint glow underneath
@@ -131,17 +164,53 @@ export default function HeatmapMap() {
     }
   }, [])
 
+  // Push the date-filtered track set into the existing map source.
+  useEffect(() => {
+    if (status !== 'ready') return
+    const source = mapRef.current?.getSource('tracks') as GeoJSONSource | undefined
+    source?.setData(toFeatureCollection(visibleTracks))
+  }, [visibleTracks, status])
+
   return (
-    <div className="relative h-full w-full bg-zinc-900">
-      <div ref={containerRef} className="absolute inset-0" />
-      {status !== 'ready' && (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-400 px-6 text-center">
-          {status === 'loading' && 'Loading heatmap…'}
-          {status === 'empty' &&
-            'No GPS tracks yet. Sync from Intervals.icu or upload GPX/FIT files with GPS data.'}
-          {status === 'error' && (message ?? 'Something went wrong.')}
+    <div className="space-y-4">
+      {status === 'ready' && domain && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex-1 min-w-64">
+            <DateRangeSlider
+              min={domain.min}
+              max={domain.max}
+              from={range?.from ?? domain.min}
+              to={range?.to ?? domain.max}
+              onChange={(from, to) => setRange({ from, to })}
+            />
+          </div>
+          {range && (
+            <button
+              onClick={() => setRange(null)}
+              className="text-sm text-zinc-500 hover:text-zinc-900 border border-zinc-200 rounded-lg px-3 py-2 bg-white transition-colors"
+            >
+              Reset to all time
+            </button>
+          )}
         </div>
       )}
+      {status === 'ready' && range && (
+        <p className="text-xs text-zinc-500">
+          Showing {visibleTracks.length} of {tracks.length} runs with GPS.
+        </p>
+      )}
+
+      <div className="relative h-[calc(100vh-18rem)] min-h-[400px] w-full bg-zinc-900 rounded-2xl border border-zinc-200 overflow-hidden">
+        <div ref={containerRef} className="absolute inset-0" />
+        {status !== 'ready' && (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-400 px-6 text-center">
+            {status === 'loading' && 'Loading heatmap…'}
+            {status === 'empty' &&
+              'No GPS tracks yet. Sync from Intervals.icu or upload GPX/FIT files with GPS data.'}
+            {status === 'error' && (message ?? 'Something went wrong.')}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

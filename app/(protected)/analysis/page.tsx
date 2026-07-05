@@ -1,4 +1,6 @@
-import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { findActivities } from '@/lib/activities'
 import AnalysisView from '@/components/analysis/AnalysisView'
 
 export const metadata = {
@@ -6,7 +8,8 @@ export const metadata = {
 }
 
 export default async function AnalysisPage() {
-  const activities = await prisma.activity.findMany({
+  const session = await getServerSession(authOptions)
+  const activities = await findActivities(session, {
     orderBy: { date: 'asc' },
     select: {
       id: true,
@@ -17,6 +20,9 @@ export default async function AnalysisPage() {
       avgPace: true,
       avgHeartRate: true,
       maxHeartRate: true,
+      weatherTempC: true,
+      weatherDewPointC: true,
+      weatherApparentTempC: true,
     },
   })
 

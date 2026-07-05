@@ -1,9 +1,14 @@
+import { getServerSession } from 'next-auth'
+import type { Session } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { findActivities, findActivityById } from '@/lib/activities'
 import { notFound } from 'next/navigation'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import RouteMap, { type RoutePoint } from '@/components/RouteMap'
 import RunDetailStats from '@/components/RunDetailStats'
+import WeatherBadge from '@/components/WeatherBadge'
 import RunDeepDive from '@/components/deepdive/RunDeepDive'
 import { bestEfforts, type EffortActivity } from '@/lib/records'
 import { estimateMaxHr, trimp } from '@/lib/analysis'
@@ -17,8 +22,8 @@ function asNumberArray(value: unknown): number[] | null {
 }
 
 /** Labels of the PR targets this run currently holds the record for. */
-async function currentPrLabels(activityId: string): Promise<string[]> {
-  const activities = await prisma.activity.findMany({
+async function currentPrLabels(session: Session | null, activityId: string): Promise<string[]> {
+  const activities = await findActivities(session, {
     select: {
       id: true,
       name: true,
@@ -62,11 +67,12 @@ export default async function RunDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const session = await getServerSession(authOptions)
 
   const [activity, settings, allActivities] = await Promise.all([
-    prisma.activity.findUnique({ where: { id }, include: { stream: true } }),
+    findActivityById(session, id, { include: { stream: true } }),
     prisma.userSettings.findUnique({ where: { id: 1 } }),
-    prisma.activity.findMany({
+    findActivities(session, {
       orderBy: { date: 'desc' },
       select: { id: true, name: true, date: true, distance: true, duration: true, avgPace: true, avgHeartRate: true, maxHeartRate: true },
     }),
@@ -75,7 +81,7 @@ export default async function RunDetailPage({
   if (!activity) notFound()
 
   const coordinates = parseCoordinates(activity.coordinates as unknown)
-  const prLabels = await currentPrLabels(id)
+  const prLabels = await currentPrLabels(session, id)
 
   // Build stream data for deep dive
   let streams: RunStreams | null = null
@@ -146,6 +152,17 @@ export default async function RunDetailPage({
         sport={activity.sport}
         source={activity.source}
       />
+
+      {/* Weather at run time (populated by the Open-Meteo backfill) */}
+      {activity.weatherTempC !== null &&
+        activity.weatherDewPointC !== null &&
+        activity.weatherApparentTempC !== null && (
+          <WeatherBadge
+            tempC={activity.weatherTempC}
+            dewPointC={activity.weatherDewPointC}
+            apparentTempC={activity.weatherApparentTempC}
+          />
+        )}
 
       {/* Route map */}
       {coordinates.length > 0 ? (

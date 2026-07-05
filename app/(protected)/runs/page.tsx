@@ -1,8 +1,11 @@
-import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { findActivities } from '@/lib/activities'
 import RunsView from '@/components/RunsView'
 
 export default async function RunsPage() {
-  const activities = await prisma.activity.findMany({
+  const session = await getServerSession(authOptions)
+  const activities = await findActivities(session, {
     orderBy: { date: 'desc' },
     select: {
       id: true,
