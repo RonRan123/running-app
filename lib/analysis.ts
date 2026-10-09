@@ -1,8 +1,9 @@
 import { addDays, differenceInCalendarDays, format, startOfDay, startOfWeek } from 'date-fns'
 
-// All HR-based analysis works from per-run average HR — we don't store HR
-// streams, so a whole run is classified by its average. That's a coarser
-// approximation than time-in-zone, but trends across many runs still hold.
+// Most HR-based analysis works from per-run average HR. The effort
+// distribution chart is the exception: it uses per-sample time-in-zone
+// (`zoneSeconds`, computed server-side from HR streams) and only falls back
+// to classifying a whole run by its average when a run has no HR stream.
 
 export interface AnalysisActivity {
   id: string
@@ -18,6 +19,9 @@ export interface AnalysisActivity {
   weatherTempC?: number | null
   weatherDewPointC?: number | null
   weatherApparentTempC?: number | null
+  // Seconds in each effort band from the HR stream; null when the run has
+  // no HR stream (or it wasn't selected).
+  zoneSeconds?: Record<Effort, number> | null
 }
 
 // Assumed resting HR for TRIMP — not collected anywhere in the app.
@@ -131,34 +135,55 @@ export function acuteChronicRatio(load: LoadPoint[]) {
 
 export interface WeeklyZones {
   weekStart: string // yyyy-MM-dd (Monday)
+  easySec: number
+  moderateSec: number
+  hardSec: number
   easyPct: number
   moderatePct: number
   hardPct: number
+  // Runs this week classified by avg HR because they had no HR stream.
+  fallbackRuns: number
 }
 
-/** Weekly easy/moderate/hard split, % of run time, runs classified by avg HR. */
-export function weeklyZoneDistribution(
+/**
+ * Weekly time spent easy / moderate / hard. Uses per-sample time-in-zone
+ * where a run has an HR stream; otherwise the whole run's duration goes to
+ * the band of its average HR, so no week silently loses time.
+ */
+export function weeklyTimeInZones(
   activities: AnalysisActivity[],
   maxHr: number,
 ): WeeklyZones[] {
-  const weeks = new Map<string, { easy: number; moderate: number; hard: number }>()
+  const weeks = new Map<string, Record<Effort, number> & { fallbackRuns: number }>()
   for (const a of activities) {
-    if (!a.avgHeartRate) continue
+    if (!a.zoneSeconds && !a.avgHeartRate) continue
     const key = format(startOfWeek(new Date(a.date), { weekStartsOn: 1 }), 'yyyy-MM-dd')
-    const week = weeks.get(key) ?? { easy: 0, moderate: 0, hard: 0 }
-    week[classifyEffort(a.avgHeartRate, maxHr)] += a.duration
+    const week = weeks.get(key) ?? { easy: 0, moderate: 0, hard: 0, fallbackRuns: 0 }
+    if (a.zoneSeconds) {
+      week.easy += a.zoneSeconds.easy
+      week.moderate += a.zoneSeconds.moderate
+      week.hard += a.zoneSeconds.hard
+    } else {
+      week[classifyEffort(a.avgHeartRate!, maxHr)] += a.duration
+      week.fallbackRuns++
+    }
     weeks.set(key, week)
   }
 
   return [...weeks.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
+    .filter(([, w]) => w.easy + w.moderate + w.hard > 0)
     .map(([weekStart, w]) => {
       const total = w.easy + w.moderate + w.hard
       return {
         weekStart,
+        easySec: w.easy,
+        moderateSec: w.moderate,
+        hardSec: w.hard,
         easyPct: (w.easy / total) * 100,
         moderatePct: (w.moderate / total) * 100,
         hardPct: (w.hard / total) * 100,
+        fallbackRuns: w.fallbackRuns,
       }
     })
 }

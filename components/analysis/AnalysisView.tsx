@@ -11,7 +11,7 @@ import {
   fitnessFatigue,
   longRunByWeek,
   weeklyVolume,
-  weeklyZoneDistribution,
+  weeklyTimeInZones,
   type AnalysisActivity,
 } from '@/lib/analysis'
 import AerobicScatter from './AerobicScatter'
@@ -52,7 +52,7 @@ export default function AnalysisView({ activities }: { activities: AnalysisActiv
   }, [activities, range])
 
   const maxHr = useMemo(() => estimateMaxHr(activities), [activities])
-  const weeklyZones = useMemo(() => weeklyZoneDistribution(inRange, maxHr), [inRange, maxHr])
+  const weeklyZones = useMemo(() => weeklyTimeInZones(inRange, maxHr), [inRange, maxHr])
   const weeklyVol = useMemo(() => weeklyVolume(inRange, range.from, range.to), [inRange, range])
   const load = useMemo(() => fitnessFatigue(activities, maxHr), [activities, maxHr])
   const loadRatio = useMemo(() => acuteChronicRatio(load), [load])

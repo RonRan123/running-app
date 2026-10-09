@@ -129,8 +129,10 @@ export default function HowToUsePage() {
 
           <Chart name="Effort Distribution">
             <p>
-              Each week&apos;s running time split into easy / moderate / hard. The dashed line
-              marks the 75% easy target: decades of coaching practice (and the training of nearly
+              Each week&apos;s running time split into easy / moderate / hard, shown in hours or as
+              a percentage (toggle at the top right). Time is classified second by second from your
+              heart rate, so a run with an easy warm-up and a hard finish is split correctly rather
+              than counted as one effort. In the % view, the dashed line marks the 75% easy target: decades of coaching practice (and the training of nearly
               every elite distance runner) says roughly 75–80% of running should be easy. Weeks
               with a thin green band are the warning sign — usually it means easy runs are being
               run too hard, which blunts recovery without adding fitness.
