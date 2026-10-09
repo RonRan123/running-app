@@ -9,6 +9,7 @@ import { mafTarget, timeInZones, type RunStreams, type Split } from '@/lib/runAn
 import HrChart from './HrChart'
 import PaceChart from './PaceChart'
 import ElevationChart from './ElevationChart'
+import CadenceChart from './CadenceChart'
 import SplitsTable from './SplitsTable'
 import ZoneBar from './ZoneBar'
 
@@ -94,6 +95,7 @@ export default function RunDeepDive({
             <PaceChart streams={streams} unit={unit} />
             <ElevationChart streams={streams} unit={unit} />
           </div>
+          <CadenceChart streams={streams} unit={unit} />
           {zones ? <ZoneBar zones={zones} maxHr={maxHr} /> : null}
           <SplitsTable splits={unit === 'mi' ? splitsMi : splitsKm} unit={unit} />
         </>

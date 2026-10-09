@@ -3,7 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { findActivities } from '@/lib/activities'
 import AnalysisView from '@/components/analysis/AnalysisView'
 import { estimateMaxHr } from '@/lib/analysis'
-import { timeInZones } from '@/lib/runAnalysis'
+import { runningForm, timeInZones } from '@/lib/runAnalysis'
 
 export const metadata = {
   title: 'Analysis — Running Dashboard',
@@ -25,12 +25,12 @@ export default async function AnalysisPage() {
       weatherTempC: true,
       weatherDewPointC: true,
       weatherApparentTempC: true,
-      stream: { select: { time: true, heartrate: true } },
+      stream: { select: { time: true, heartrate: true, cadence: true, velocity: true, distance: true } },
     },
   })
 
-  // Time-in-zone is classified sample-by-sample here so raw HR streams never
-  // ship to the client. Same max-HR estimate AnalysisView derives client-side.
+  // Time-in-zone and running form are computed from streams here so raw
+  // streams never ship to the client. Same max-HR estimate AnalysisView derives client-side.
   const maxHr = estimateMaxHr(activities.map(a => ({ ...a, date: a.date.toISOString() })))
 
   return (
@@ -41,7 +41,22 @@ export default async function AnalysisPage() {
         const zones = time && hr && hr.length === time.length ? timeInZones(time, hr, maxHr) : null
         // An HR stream with no usable samples falls back to avg-HR classification.
         const hasTime = zones && zones.easy + zones.moderate + zones.hard > 0
-        return { ...a, date: a.date.toISOString(), zoneSeconds: hasTime ? zones : null }
+        const cadence = stream?.cadence as number[] | null | undefined
+        const velocity = stream?.velocity as number[] | null | undefined
+        const distance = stream?.distance as number[] | null | undefined
+        const aligned = (xs: number[] | null | undefined): xs is number[] =>
+          !!time && !!xs && xs.length === time.length
+        const form =
+          time && aligned(cadence) && aligned(velocity) && aligned(distance)
+            ? runningForm(time, cadence, velocity, distance)
+            : null
+        return {
+          ...a,
+          date: a.date.toISOString(),
+          zoneSeconds: hasTime ? zones : null,
+          cadenceSpm: form?.cadenceSpm ?? null,
+          stepLengthM: form?.stepLengthM ?? null,
+        }
       })}
     />
   )

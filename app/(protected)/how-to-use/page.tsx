@@ -139,6 +139,19 @@ export default function HowToUsePage() {
             </p>
           </Chart>
 
+          <Chart name="Running Form">
+            <p>
+              Cadence is how many steps you take per minute (both feet). Step length is how far
+              you travel with each one. Speed is simply the two multiplied, so you can get faster
+              by taking quicker steps, longer steps, or both. The dots are individual runs and the
+              line is a 28-day rolling average. Both numbers naturally rise when you run faster,
+              which is why the chart defaults to easy runs only, so like is compared with like.
+              A slowly rising cadence at the same easy effort is generally a good sign (lighter,
+              quicker steps are easier on the joints); a sudden drop in either can point to
+              fatigue or a niggle worth paying attention to.
+            </p>
+          </Chart>
+
           <Chart name="Performance vs. Weather">
             <p>
               Aerobic efficiency plotted against the &quot;feels like&quot; temperature for each

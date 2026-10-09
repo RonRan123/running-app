@@ -22,6 +22,9 @@ export interface AnalysisActivity {
   // Seconds in each effort band from the HR stream; null when the run has
   // no HR stream (or it wasn't selected).
   zoneSeconds?: Record<Effort, number> | null
+  // Running form from cadence + velocity streams; null without a cadence stream.
+  cadenceSpm?: number | null
+  stepLengthM?: number | null
 }
 
 // Assumed resting HR for TRIMP — not collected anywhere in the app.

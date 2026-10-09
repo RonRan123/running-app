@@ -17,6 +17,7 @@ import {
 import AerobicScatter from './AerobicScatter'
 import EfficiencyTrend from './EfficiencyTrend'
 import ZoneDistribution from './ZoneDistribution'
+import RunningForm from './RunningForm'
 import WeeklyVolumeChart from './WeeklyVolumeChart'
 import FitnessFatigue from './FitnessFatigue'
 import LoadRatioCard from './LoadRatioCard'
@@ -88,6 +89,7 @@ export default function AnalysisView({ activities }: { activities: AnalysisActiv
         <Zone2PaceTrend activities={inRange} maxHr={maxHr} unit={unit} />
       </div>
       <ZoneDistribution weekly={weeklyZones} />
+      <RunningForm activities={inRange} maxHr={maxHr} unit={unit} />
       <WeatherPerformance activities={inRange} unit={unit} />
 
       {/* Training load — fixed windows, independent of the slider */}

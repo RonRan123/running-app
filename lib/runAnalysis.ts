@@ -39,6 +39,55 @@ export function timeInZones(time: number[], heartrate: number[], maxHr: number) 
   return zones
 }
 
+// Below this speed a sample is treated as walking / standing, not running form.
+const MIN_RUNNING_SPEED = 1.5 // m/s (~11:07 min/km)
+
+/**
+ * Cadence streams from Intervals.icu / FIT record one foot (~70–95 rpm).
+ * Runners talk in steps per minute (both feet, ~150–190), so double any
+ * stream whose typical value is clearly one-foot.
+ */
+export function normalizeCadence(cadence: number[]): number[] {
+  const positive = cadence.filter(c => c > 0).sort((a, b) => a - b)
+  const median = positive[positive.length >> 1] ?? 0
+  return median > 0 && median < 120 ? cadence.map(c => c * 2) : cadence
+}
+
+/**
+ * Average cadence (steps/min) and step length (m) over running samples.
+ * Step length is total distance ÷ total steps, not a mean of per-sample
+ * ratios, so slow noisy samples don't skew it. This is what Garmin calls
+ * "stride length". Distance comes from the cumulative distance stream:
+ * velocity_smooth carries GPS spikes that inflate step length by 50 %+ on
+ * some runs, while the distance stream agrees with the run's total.
+ */
+export function runningForm(
+  time: number[],
+  cadence: number[],
+  velocity: number[],
+  distance: number[],
+): { cadenceSpm: number; stepLengthM: number } | null {
+  const spm = normalizeCadence(cadence)
+  let seconds = 0
+  let steps = 0
+  let meters = 0
+  for (let i = 1; i < time.length; i++) {
+    const dt = time[i] - time[i - 1]
+    // Skip pauses (multi-second gaps) and non-running samples.
+    if (dt <= 0 || dt > 10 || !(spm[i] > 0) || !(velocity[i] >= MIN_RUNNING_SPEED)) continue
+    const dd = distance[i] - distance[i - 1]
+    if (!(dd >= 0)) continue
+    seconds += dt
+    steps += (spm[i] / 60) * dt
+    meters += dd
+  }
+  if (seconds < 120 || steps === 0) return null
+  const cadenceSpm = (steps / seconds) * 60
+  // A session averaging under ~120 spm is a walk or hike, not running form.
+  if (cadenceSpm < 120) return null
+  return { cadenceSpm, stepLengthM: meters / steps }
+}
+
 /** Rolling time-window average — smooths noisy per-sample series for display. */
 export function smoothSeries(time: number[], values: number[], windowSec = 30): number[] {
   const out = new Array<number>(values.length)
