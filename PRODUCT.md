@@ -376,9 +376,9 @@ A single explanatory page that gives any user — including the demo account —
 
 ---
 
-## Wave 13 — Time in Zone, Route Comparison, Form Trends
+## Wave 13 — Time in Zone, Segments, Form Trends
 
-> Goal: Move effort tracking from per-run averages to real time-in-zone, let the same route be compared across dates (starting simple, growing toward segment-level analysis), chart running form over time, and make the Sync button reliably show new runs without a page reload.
+> Goal: Move effort tracking from per-run averages to real time-in-zone, automatically discover the most-run segments and track performance on them over time, chart running form over time, and make the Sync button reliably show new runs without a page reload.
 
 **Sync shows the latest run immediately (bug fix)**
 
@@ -398,20 +398,50 @@ The existing Effort Distribution chart classifies a *whole run* by its average H
 - [ ] Payload: compute zone totals server-side in `analysis/page.tsx` — don't ship raw HR streams to the client
 - [ ] Update the Effort Distribution section of `/how-to-use`
 
-**Route comparison — Phase 1 (this wave): same route, different dates**
+**Auto-discovered segments: top 5 most-run stretches**
 
-Start simple: whole-route matching, no segments yet.
-- [ ] `lib/routes.ts` `findMatchingRuns(activity, candidates)`: a run matches when start points are within ~150 m, end points within ~150 m, distance within ±5 %, and the downsampled tracks agree (e.g. ≥ 80 % of sampled points of each within ~50 m of the other). Pure function, unit-testable, computed on demand (no new table yet)
-- [ ] Run detail page gains a **"Same route" card** listing matching runs (date, time, avg pace, avg HR, EF) when ≥ 1 match exists
-- [ ] **Route comparison view** (`/runs/[id]/compare`): pick up to ~5 of the matching runs and overlay them on one chart — x = distance along route, y = speed (pace, unit-aware), with the route's elevation profile drawn as a shaded area behind on a secondary axis. Each run is its own line, colored by date (older = lighter)
-- [ ] Summary trend under the chart: finish time, avg pace, avg HR, and EF for each matching run over time, so improvement at the same effort is visible
-- [ ] Heatmap: clicking a track opens a small popup ("Run on Mar 3 · 8.2 km · 4 matching runs → Compare"). Click handling only — no segment selection yet
-- [ ] Respects the demo date window for every query
+Routes are rarely repeated whole (runs get spliced together from familiar pieces), so the unit of comparison is the **segment**, a stretch run many times across different routes. Segments are discovered automatically by overlaying every GPS run and measuring where they overlap.
 
-*Later phases (not this wave — listed so Phase 1 doesn't paint us into a corner):*
-- *Phase 2 — route groups:* persist matched groups (`Route` table, `Activity.routeId`) so the heatmap can highlight "routes I run often" and compare without recomputing
-- *Phase 3 — segments:* click two points on a heatmap track to define a segment; find every run that passes through it (in either direction) and plot segment speed vs. elevation over time
-- *Phase 4 — effort-normalized comparison:* grade-adjusted pace (`gradeAdjustedVelocity()` already exists) and HR overlay, plus weather from Wave 12, so a hot-day slowdown isn't read as lost fitness
+*Prerequisite: time-aligned GPS*
+- [ ] Verify whether Intervals.icu `/map` coordinates are index-aligned with `ActivityStream.time`. If not, fetch the `latlng` stream (`data` = lats, `data2` = lngs) instead, store it time-aligned, and re-fetch once for existing runs. Discovery doesn't need timestamps, but timing efforts does. GPX/FIT uploads are already aligned
+
+*Discovery (`lib/segments/discover.ts`, pure functions, unit-tested)*
+1. [ ] **Resample** every GPS run to one point per 10 m along its path (local metric projection), so recording rate doesn't bias anything
+2. [ ] **Overlay on a grid** of ~20 m cells. Each run marks the cells it passes through **plus their immediate neighbours**, which absorbs GPS noise so the same path on different days lands in the same cells. Counts are *distinct runs* per cell, so laps don't inflate a cell
+3. [ ] **Hot cells** = cells touched by ≥ `MIN_RUNS` runs (start at 5)
+4. [ ] **Candidate stretches**: walk each run's resampled path and cut out the maximal stretches that stay in hot cells (bridging gaps < 50 m), keeping those ≥ `MIN_LENGTH` (start at 800 m)
+5. [ ] **Split at junctions**: along each candidate, cut where the run count changes by ≥ 30 % (a branch joins or peels off). Each piece then has roughly uniform traffic and ends at a natural decision point
+6. [ ] **Merge duplicates**: candidates from different runs describing the same stretch (ends within 50 m, ≥ 90 % shape overlap) collapse into one. The representative geometry is the medoid, the candidate closest to all the others, so one noisy GPS trace doesn't define the segment
+7. [ ] **Direction**: count efforts per direction. A segment takes its dominant direction; the reverse becomes its own candidate if it independently qualifies
+8. [ ] **Strength** = number of distinct runs with a full effort on it (via the matcher below), tie-broken by length. Exclude stretches whose start is within ~300 m of the most common run start, so "the first block outside the front door" doesn't win every time
+9. [ ] **Top 5**, chosen greedily by strength, skipping any candidate that overlaps an already-picked segment by > 30 %
+
+*Effort matching (`lib/segments/match.ts`)*
+- [ ] Bounding-box prefilter (segment bbox + 50 m) → every pass within 30 m of the segment start → first point after it within 30 m of the end, with path length within ±15 % of the segment → both-way shape check: ≥ 90 % of points within 40 m. One run can yield multiple efforts
+- [ ] Start/end crossing times interpolated between GPS samples, not snapped to the nearest sample
+- [ ] Per effort: elapsed time, avg pace, avg HR, EF, grade-adjusted pace, plus that run's weather
+
+*Storage & refresh*
+- [ ] New `Segment` (geometry resampled at 10 m, length, elevation profile, direction, strength, `name`, `pinned`) and `SegmentEffort` (segment, activity, start/end sample index, interpolated start/end time, metrics) tables
+- [ ] Discovery runs from an admin action ("Rediscover segments" in Settings) and after a sync adds runs, never on page load. New runs get efforts matched against existing segments on sync
+- [ ] Re-discovery is stable: a new top-5 candidate overlapping an existing segment by ≥ 70 % updates it in place, keeping your rename. Pinned segments are never dropped
+- [ ] Segments get auto-names from position ("Segment 1 · 1.4 km"), renameable
+
+*Views*
+- [ ] **`/segments`** page (in nav near Heatmap): map with the 5 segments highlighted, each card showing length, elevation gain, effort count, best/latest time
+- [ ] **Segment detail** (`/segments/[id]`):
+  - efforts table and trend chart (pace, avg HR, EF over date), so faster-at-the-same-effort is visible
+  - **speed vs. elevation overlay**: pick up to 5 efforts; x = distance along the segment (each effort projected onto the segment geometry so hills line up), y = speed (unit-aware), elevation profile shaded behind
+- [ ] Heatmap: segments drawn as a highlighted layer; clicking one opens a popup linking to its detail page
+- [ ] Run detail page lists the segment efforts in that run, with rank among all efforts
+- [ ] All queries respect the demo date window
+
+*Validation before UI*
+- [ ] Run discovery on real data and render the top ~10 candidates on a static map for review; tune `MIN_RUNS`, `MIN_LENGTH`, cell size and split threshold before building the pages
+
+*Later: not this wave*
+- *Manual segments*: draw your own by clicking two points on a heatmap track; same matcher
+- *Effort-normalized comparison*: grade-adjusted pace + HR + weather overlay so a hot-day slowdown isn't read as lost fitness
 
 **Cadence & stride length over time**
 - [ ] Verify cadence units first: Intervals.icu / FIT cadence for running can arrive as **one-foot rpm** (~85) rather than steps per minute (~170). Check against a known run and normalize to steps/min in one helper (`normalizeCadence()`), applied at read time so stored data isn't rewritten
@@ -422,7 +452,7 @@ Start simple: whole-route matching, no segments yet.
 - [ ] Run detail deep dive gains a cadence line on the existing charts if the stream exists
 - [ ] Add a Running Form section to `/how-to-use` (what cadence and stride length are, what a healthy trend looks like)
 
-- [ ] **Test**: log in, record/upload a new run in Intervals.icu, click Sync on `/runs` without reloading → new run appears in the list; login sync + immediate manual sync no longer returns a 502; Effort chart shows hours per week in absolute mode and percentages summing to 100 % in % view, and a run with an HR stream that's half easy / half hard splits accordingly instead of counting as one zone; a run on a repeated route shows its matches on the run detail page, a different route with the same distance does not match; compare view overlays the selected runs with elevation behind and pace in the chosen unit; clicking a heatmap track opens the popup and links to compare; cadence values land in the ~150–190 spm range after normalization; stride length is plausible (~0.8–1.4 m); demo session sees only in-window runs in matches, compare, and form charts; all new views render at 390 px with no horizontal overflow
+- [ ] **Test**: log in, record/upload a new run in Intervals.icu, click Sync on `/runs` without reloading → new run appears in the list; login sync + immediate manual sync no longer returns a 502; Effort chart shows hours per week in absolute mode and percentages summing to 100 % in % view, and a run with an HR stream that's half easy / half hard splits accordingly instead of counting as one zone; discovery returns 5 non-overlapping segments that each show ≥ 5 distinct runs and look right on the map; the front-door stretch is not among them; a run passing through a segment twice yields two efforts; a run that hits the start and end but takes a different street between does not match; renaming a segment survives re-discovery; the speed-vs-elevation overlay lines hills up across efforts; clicking a segment on the heatmap links to its page; cadence values land in the ~150–190 spm range after normalization; stride length is plausible (~0.8–1.4 m); demo session sees only in-window runs in segment efforts and form charts; all new views render at 390 px with no horizontal overflow
 
 ---
 
