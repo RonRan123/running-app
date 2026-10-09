@@ -376,6 +376,56 @@ A single explanatory page that gives any user — including the demo account —
 
 ---
 
+## Wave 13 — Time in Zone, Route Comparison, Form Trends
+
+> Goal: Move effort tracking from per-run averages to real time-in-zone, let the same route be compared across dates (starting simple, growing toward segment-level analysis), chart running form over time, and make the Sync button reliably show new runs without a page reload.
+
+**Sync shows the latest run immediately (bug fix)**
+
+Root cause: every login fires a background `runSync()` (`lib/auth.ts` `signIn` event) that isn't awaited. The runs page renders before it finishes, so the new run isn't in the list. When Sync is then clicked, the background sync has already stored it, `/api/sync` returns `synced: 0`, and `SyncButton` only calls `router.refresh()` when `synced > 0` — so the list never re-renders.
+- [ ] `SyncButton` calls `router.refresh()` after **every** successful sync, not only when `synced > 0`
+- [ ] Change the `synced === 0` message from "Already up to date" to "Up to date". The login sync may have just pulled in a new run, so "already" is misleading
+- [ ] Guard against the login sync and a manual sync racing: concurrent `prisma.activity.create` on the same `externalId` hits the unique constraint and currently surfaces as a 502. Treat a P2002 unique violation in `runSync` as "skipped", not a failure
+- [ ] Verify against Next 16 `router.refresh()` semantics (read `node_modules/next/dist/docs/` first) — the runs page must re-run its server query, not serve a cached RSC payload
+
+**Weekly time spent easy / moderate / hard**
+
+The existing Effort Distribution chart classifies a *whole run* by its average HR and shows only percentages. Now that `ActivityStream.heartrate` is stored, use true per-sample time-in-zone.
+- [ ] New `weeklyTimeInZones()` in `lib/analysis.ts`, reusing `timeInZones()` from `lib/runAnalysis.ts` (same `EASY_CEILING` / `MODERATE_CEILING` bands) per run, summed per Monday-start week
+- [ ] Runs without an HR stream fall back to the current avg-HR whole-run classification so no week silently loses time; tooltip notes how many runs used the fallback
+- [ ] Chart shows **absolute time** (hours/minutes stacked: easy / moderate / hard) with a toggle to the existing **% view**; the 75 % easy target line only appears in % view
+- [ ] Replaces the current `ZoneDistribution` chart (no duplicate cards); respects the Analysis date-range slider and the demo date window (streams loaded via `findActivities` include, never `prisma.activity` directly)
+- [ ] Payload: compute zone totals server-side in `analysis/page.tsx` — don't ship raw HR streams to the client
+- [ ] Update the Effort Distribution section of `/how-to-use`
+
+**Route comparison — Phase 1 (this wave): same route, different dates**
+
+Start simple: whole-route matching, no segments yet.
+- [ ] `lib/routes.ts` `findMatchingRuns(activity, candidates)`: a run matches when start points are within ~150 m, end points within ~150 m, distance within ±5 %, and the downsampled tracks agree (e.g. ≥ 80 % of sampled points of each within ~50 m of the other). Pure function, unit-testable, computed on demand (no new table yet)
+- [ ] Run detail page gains a **"Same route" card** listing matching runs (date, time, avg pace, avg HR, EF) when ≥ 1 match exists
+- [ ] **Route comparison view** (`/runs/[id]/compare`): pick up to ~5 of the matching runs and overlay them on one chart — x = distance along route, y = speed (pace, unit-aware), with the route's elevation profile drawn as a shaded area behind on a secondary axis. Each run is its own line, colored by date (older = lighter)
+- [ ] Summary trend under the chart: finish time, avg pace, avg HR, and EF for each matching run over time, so improvement at the same effort is visible
+- [ ] Heatmap: clicking a track opens a small popup ("Run on Mar 3 · 8.2 km · 4 matching runs → Compare"). Click handling only — no segment selection yet
+- [ ] Respects the demo date window for every query
+
+*Later phases (not this wave — listed so Phase 1 doesn't paint us into a corner):*
+- *Phase 2 — route groups:* persist matched groups (`Route` table, `Activity.routeId`) so the heatmap can highlight "routes I run often" and compare without recomputing
+- *Phase 3 — segments:* click two points on a heatmap track to define a segment; find every run that passes through it (in either direction) and plot segment speed vs. elevation over time
+- *Phase 4 — effort-normalized comparison:* grade-adjusted pace (`gradeAdjustedVelocity()` already exists) and HR overlay, plus weather from Wave 12, so a hot-day slowdown isn't read as lost fitness
+
+**Cadence & stride length over time**
+- [ ] Verify cadence units first: Intervals.icu / FIT cadence for running can arrive as **one-foot rpm** (~85) rather than steps per minute (~170). Check against a known run and normalize to steps/min in one helper (`normalizeCadence()`), applied at read time so stored data isn't rewritten
+- [ ] Stride length derived per run as `speed ÷ (cadence / 60)` over samples where the runner is moving (velocity above a walking threshold), reported as average step length in m (ft-in when unit is mi — same convention Garmin uses for "stride length")
+- [ ] Per-run averages computed server-side; new **Running Form** chart on `/analysis`: cadence (spm) and stride length on dual axes, one dot per run with a rolling 4-week average line
+- [ ] Option to filter to easy runs only (via effort classification), since cadence and stride naturally rise with pace and mixing them hides the trend
+- [ ] Runs without a cadence stream are skipped; empty state if fewer than a handful qualify
+- [ ] Run detail deep dive gains a cadence line on the existing charts if the stream exists
+- [ ] Add a Running Form section to `/how-to-use` (what cadence and stride length are, what a healthy trend looks like)
+
+- [ ] **Test**: log in, record/upload a new run in Intervals.icu, click Sync on `/runs` without reloading → new run appears in the list; login sync + immediate manual sync no longer returns a 502; Effort chart shows hours per week in absolute mode and percentages summing to 100 % in % view, and a run with an HR stream that's half easy / half hard splits accordingly instead of counting as one zone; a run on a repeated route shows its matches on the run detail page, a different route with the same distance does not match; compare view overlays the selected runs with elevation behind and pace in the chosen unit; clicking a heatmap track opens the popup and links to compare; cadence values land in the ~150–190 spm range after normalization; stride length is plausible (~0.8–1.4 m); demo session sees only in-window runs in matches, compare, and form charts; all new views render at 390 px with no horizontal overflow
+
+---
+
 ## Rules for Building
 
 1. Complete one wave fully before starting the next.
