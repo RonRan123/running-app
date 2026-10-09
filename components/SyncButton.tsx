@@ -25,10 +25,13 @@ export default function SyncButton() {
       } else {
         const text =
           data.synced === 0
-            ? 'Already up to date'
+            ? 'Up to date'
             : `${data.synced} new ${data.synced === 1 ? 'run' : 'runs'} synced`
         setMessage({ text, ok: true })
-        if (data.synced > 0) router.refresh()
+        // Always refresh: the background sync fired on login may already have
+        // stored new runs after this page rendered, in which case this sync
+        // reports 0 but the list on screen is still stale.
+        router.refresh()
       }
     } catch {
       setMessage({ text: 'Sync failed — check connection', ok: false })
