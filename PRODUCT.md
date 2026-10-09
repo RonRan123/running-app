@@ -410,7 +410,7 @@ Routes are rarely repeated whole (runs get spliced together from familiar pieces
 2. [ ] **Overlay on a grid** of ~20 m cells. Each run marks the cells it passes through **plus their immediate neighbours**, which absorbs GPS noise so the same path on different days lands in the same cells. Counts are *distinct runs* per cell, so laps don't inflate a cell
 3. [ ] **Hot cells** = cells touched by ≥ `MIN_RUNS` runs (start at 5)
 4. [ ] **Candidate stretches**: walk each run's resampled path and cut out the maximal stretches that stay in hot cells (bridging gaps < 50 m), keeping those ≥ `MIN_LENGTH` (start at 800 m)
-5. [ ] **Split at junctions**: along each candidate, cut where the run count changes by ≥ 30 % (a branch joins or peels off). Each piece then has roughly uniform traffic and ends at a natural decision point
+5. [ ] **Split at junctions**: along each candidate, cut where the set of runs passing changes (Jaccard similarity of run sets drops below ~0.7; a branch joins or peels off). Each piece then has roughly uniform traffic and ends at a natural decision point
 6. [ ] **Merge duplicates**: candidates from different runs describing the same stretch (ends within 50 m, ≥ 90 % shape overlap) collapse into one. The representative geometry is the medoid, the candidate closest to all the others, so one noisy GPS trace doesn't define the segment
 7. [ ] **Direction**: count efforts per direction. A segment takes its dominant direction; the reverse becomes its own candidate if it independently qualifies
 8. [ ] **Strength** = number of distinct runs with a full effort on it (via the matcher below), tie-broken by length. Exclude stretches whose start is within ~300 m of the most common run start, so "the first block outside the front door" doesn't win every time
@@ -438,6 +438,31 @@ Routes are rarely repeated whole (runs get spliced together from familiar pieces
 
 *Validation before UI*
 - [ ] Run discovery on real data and render the top ~10 candidates on a static map for review; tune `MIN_RUNS`, `MIN_LENGTH`, cell size and split threshold before building the pages
+
+*Prior art: how this approach compares (researched 2026-10-09)*
+- **`tracematch` / Veloq** (open source, built for Intervals.icu users: github.com/evanjt/tracematch): nearly the same pipeline. It rasterises tracks into a grid, keeps "hot" cells above a support floor, splits corridors where the *set of activities* passing changes, uses the medoid trace as geometry, and emits sections best-first with already-covered ground excluded. Route matching uses Average Minimum Distance, run both ways to catch subsets. Reported ~3 s for 426 tracks
+- **Refinements adopted from it:**
+  - split on a change in *which* runs pass (Jaccard overlap of run sets), not just how many. Two different groups of 15 runs on either side of a junction are different traffic even though the count is equal
+  - scale the support floor with dataset size and segment length instead of a fixed 5
+  - collapse each run to a single pass per cell before counting
+- **Not adopted:** its ~100 m cells (sized for cycling/hiking over large areas; we stay at ~20 m for city-block-scale running). We'll compare both during tuning
+- **TRACLUS** (Lee, Han, Whang, SIGMOD 2007): the classic partition-and-group sub-trajectory clustering. It confirms the core idea that clustering whole trajectories misses shared sub-paths. Its MDL partitioning + density line-segment clustering is more general but heavier than we need
+- **KDE / grid map inference** (Biagioni & Eriksson; Davies et al.): the same density → threshold → centerline idea used to infer road maps from GPS. Known weakness: heavily used paths over-aggregate, lightly used ones fragment, which is what the adaptive support floor addresses
+- **Strava**: segments are matched against stored geometry with a two-tier similarity threshold (patents US9116922 / US9208175). Effort start/end reportedly snap to the closest recorded point, causing tens-of-metres discrepancies with sparse recording; our start/end interpolation avoids this. Strava Metro snaps activities to OpenStreetMap edges and counts per edge, which is the map-matching alternative below
+- **Map matching (HMM, Newson & Krumm 2009; OSRM/Valhalla/Mapbox Map Matching)**: snap each run to the OSM path network, then count runs per edge. It gives clean junctions and geometry for free, but adds an external dependency and fails off-network (trails, tracks, parks missing from OSM)
+- **Discrete Fréchet distance**: order-aware similarity, sensitive to single GPS spikes and sampling rate. A candidate for the effort shape check if the percentage-within-corridor check proves too loose
+- Intervals.icu `latlng` stream: latitude in `data`, longitude in `data2` (forum-confirmed, verify against a live response). This is the time-aligned GPS source for the prerequisite above
+
+- [ ] **TODO: dedicated design session on segment algorithms** (before Phase 2 work, after the Phase 1 validation map exists). Walk through the approaches above with real candidate output side by side:
+  - grid density vs. OSM map-matching vs. TRACLUS-style clustering
+  - cell size (20 m vs 100 m)
+  - count-change vs. run-set-change junction splitting
+  - fixed vs. adaptive support floor
+  - percentage-in-corridor vs. Average Minimum Distance vs. Fréchet for effort matching
+  - ranking: run count vs. metres represented vs. a multi-feature score like tracematch's
+  - whether to adopt `tracematch` directly (Rust; would need WASM or a port) instead of writing our own
+
+  Outcome: settle the algorithm and thresholds and update this section
 
 *Later: not this wave*
 - *Manual segments*: draw your own by clicking two points on a heatmap track; same matcher
