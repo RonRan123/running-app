@@ -118,6 +118,32 @@ function elevationProfile(geometry: LatLng[], efforts: EffortRow[], runs: RunDat
   })
 }
 
+/**
+ * Fallback elevation from Open-Meteo's terrain model (Copernicus DEM, 90 m;
+ * free, no key) when no matching run recorded altitude. Coarser than a
+ * barometric altimeter but fine for a profile. Never throws.
+ */
+async function demElevation(geometry: LatLng[]): Promise<number[] | null> {
+  try {
+    const out: number[] = []
+    for (let i = 0; i < geometry.length; i += 100) {
+      const chunk = geometry.slice(i, i + 100)
+      const params = new URLSearchParams({
+        latitude: chunk.map(p => p.lat.toFixed(5)).join(','),
+        longitude: chunk.map(p => p.lng.toFixed(5)).join(','),
+      })
+      const res = await fetch(`https://api.open-meteo.com/v1/elevation?${params}`, { cache: 'no-store' })
+      if (!res.ok) return null
+      const data = (await res.json()) as { elevation?: number[] }
+      if (!Array.isArray(data.elevation) || data.elevation.length !== chunk.length) return null
+      out.push(...data.elevation)
+    }
+    return out
+  } catch {
+    return null
+  }
+}
+
 function sameSegment(a: LatLng[], b: LatLng[]) {
   const proj = projectionAround(a[0])
   const ax = a.map(proj.toXY)
@@ -160,9 +186,8 @@ export async function rediscoverSegments() {
     const data = {
       geometry: c.geometry as unknown as Prisma.InputJsonValue,
       lengthM: c.lengthM,
-      elevation: (elevationProfile(c.geometry, c.efforts, runs) ?? undefined) as
-        | Prisma.InputJsonValue
-        | undefined,
+      elevation: ((elevationProfile(c.geometry, c.efforts, runs) ?? (await demElevation(c.geometry))) ??
+        undefined) as Prisma.InputJsonValue | undefined,
       strength: c.strength,
     }
     const segment = match
