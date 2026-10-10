@@ -8,6 +8,7 @@ import SignOutButton from '@/components/SignOutButton'
 const navLinks = [
   { href: '/runs', label: 'Runs', exact: true },
   { href: '/runs/heatmap', label: 'Heatmap', exact: false },
+  { href: '/segments', label: 'Segments', exact: false },
   { href: '/analysis', label: 'Analysis', exact: false },
   { href: '/goals', label: 'Goals', exact: false },
   { href: '/how-to-use', label: 'How to Use', exact: false },

@@ -103,6 +103,8 @@ function buildStreams(records: any[]): ParsedStreams | null {
     altitude: has('enhanced_altitude') || has('altitude') ? altitude : null,
     cadence: has('cadence') ? cadence : null,
     distance: has('distance') ? distance : null,
+    latitude: has('position_lat') ? timed.map(r => (typeof r.position_lat === 'number' ? r.position_lat : null)) : null,
+    longitude: has('position_long') ? timed.map(r => (typeof r.position_long === 'number' ? r.position_long : null)) : null,
   }
 }
 

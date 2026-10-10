@@ -1,8 +1,9 @@
 import { addDays, differenceInCalendarDays, format, startOfDay, startOfWeek } from 'date-fns'
 
-// All HR-based analysis works from per-run average HR — we don't store HR
-// streams, so a whole run is classified by its average. That's a coarser
-// approximation than time-in-zone, but trends across many runs still hold.
+// Most HR-based analysis works from per-run average HR. The effort
+// distribution chart is the exception: it uses per-sample time-in-zone
+// (`zoneSeconds`, computed server-side from HR streams) and only falls back
+// to classifying a whole run by its average when a run has no HR stream.
 
 export interface AnalysisActivity {
   id: string
@@ -18,6 +19,12 @@ export interface AnalysisActivity {
   weatherTempC?: number | null
   weatherDewPointC?: number | null
   weatherApparentTempC?: number | null
+  // Seconds in each effort band from the HR stream; null when the run has
+  // no HR stream (or it wasn't selected).
+  zoneSeconds?: Record<Effort, number> | null
+  // Running form from cadence + velocity streams; null without a cadence stream.
+  cadenceSpm?: number | null
+  stepLengthM?: number | null
 }
 
 // Assumed resting HR for TRIMP — not collected anywhere in the app.
@@ -25,33 +32,110 @@ const REST_HR = 60
 // Fallback when no activity has a recorded max HR.
 const DEFAULT_MAX_HR = 190
 
-// Effort bands as a fraction of max HR. "Easy" tops out at ~78% HRmax
-// (the upper edge of Zone 2 in a five-zone model), "hard" starts at ~87%
-// (threshold and above).
-export const EASY_CEILING = 0.78
-export const MODERATE_CEILING = 0.87
-// Zone 2 band used for the aerobic pace trend.
-const ZONE2_FLOOR = 0.65
-
 export type Effort = 'easy' | 'moderate' | 'hard'
 
-export function estimateMaxHr(activities: AnalysisActivity[]) {
-  const observed = activities
-    .map(a => a.maxHeartRate ?? 0)
-    .reduce((max, hr) => Math.max(max, hr), 0)
-  return observed > 120 ? observed : DEFAULT_MAX_HR
+/**
+ * Heart-rate zones used everywhere in the app (bpm, inclusive bounds).
+ *
+ * Zones depend on age *on the day of the run* (from the birthday in
+ * Settings → Training), so getting older never rewrites past runs.
+ * With an age the zones are MAF-anchored:
+ *   easy     ≤ MAF (180 − age)
+ *   Zone 2   MAF − 10 … MAF
+ *   hard     ≥ 87 % of age-predicted max (220 − age)
+ *   moderate in between
+ * and max HR (for training load and "% of max") is 220 − age, or the highest
+ * recorded max if that is higher.
+ *
+ * Without a birthday (or legacy age) they fall back to fixed shares of the
+ * highest recorded max HR: easy ≤ 78 %, Zone 2 65–78 %, hard > 87 %.
+ */
+export interface HrZones {
+  basis: 'age' | 'recorded'
+  age: number | null
+  maf: number | null
+  maxHr: number
+  zone2Min: number
+  easyMax: number
+  hardMin: number
 }
 
-export function classifyEffort(avgHr: number, maxHr: number): Effort {
-  const frac = avgHr / maxHr
-  if (frac <= EASY_CEILING) return 'easy'
-  if (frac <= MODERATE_CEILING) return 'moderate'
+/** Everything needed to work out zones for any date; serializable for client components. */
+export interface HrProfile {
+  birthDate: string | null // yyyy-MM-dd
+  age: number | null // legacy fixed age, used only without a birthDate
+  recordedMax: number
+}
+
+/** Maffetone target HR: 180 − age. */
+export function mafTarget(age: number) {
+  return 180 - age
+}
+
+const HARD_SHARE = 0.87
+const EASY_SHARE = 0.78
+const ZONE2_SHARE = 0.65
+
+export function hrProfile(
+  settings: { birthDate?: Date | null; age?: number | null } | null | undefined,
+  activities: Pick<AnalysisActivity, 'maxHeartRate'>[],
+): HrProfile {
+  return {
+    birthDate: settings?.birthDate ? settings.birthDate.toISOString().slice(0, 10) : null,
+    age: settings?.age ?? null,
+    recordedMax: activities.reduce((max, a) => Math.max(max, a.maxHeartRate ?? 0), 0),
+  }
+}
+
+/** Whole years old on `date` (calendar comparison in UTC), or null if unknown. */
+export function ageOn(profile: HrProfile, date: Date | string): number | null {
+  if (!profile.birthDate) return profile.age
+  const [by, bm, bd] = profile.birthDate.split('-').map(Number)
+  const d = new Date(date)
+  const y = d.getUTCFullYear()
+  const beforeBirthday = d.getUTCMonth() + 1 < bm || (d.getUTCMonth() + 1 === bm && d.getUTCDate() < bd)
+  return y - by - (beforeBirthday ? 1 : 0)
+}
+
+export function zonesForAge(age: number | null, recordedMax: number): HrZones {
+  if (age != null && age > 0) {
+    const maf = mafTarget(age)
+    const predicted = 220 - age
+    return {
+      basis: 'age',
+      age,
+      maf,
+      maxHr: Math.max(predicted, recordedMax),
+      zone2Min: maf - 10,
+      easyMax: maf,
+      hardMin: Math.max(maf + 2, Math.round(predicted * HARD_SHARE)),
+    }
+  }
+  const maxHr = recordedMax > 120 ? recordedMax : DEFAULT_MAX_HR
+  return {
+    basis: 'recorded',
+    age: null,
+    maf: null,
+    maxHr,
+    zone2Min: Math.ceil(maxHr * ZONE2_SHARE),
+    easyMax: Math.floor(maxHr * EASY_SHARE),
+    hardMin: Math.floor(maxHr * HARD_SHARE) + 1,
+  }
+}
+
+/** Zones in force on a given date (e.g. a run's date). */
+export function zonesOn(profile: HrProfile, date: Date | string): HrZones {
+  return zonesForAge(ageOn(profile, date), profile.recordedMax)
+}
+
+export function classifyEffort(hr: number, zones: HrZones): Effort {
+  if (hr <= zones.easyMax) return 'easy'
+  if (hr < zones.hardMin) return 'moderate'
   return 'hard'
 }
 
-export function isZone2(avgHr: number, maxHr: number) {
-  const frac = avgHr / maxHr
-  return frac >= ZONE2_FLOOR && frac <= EASY_CEILING
+export function isZone2(hr: number, zones: HrZones) {
+  return hr >= zones.zone2Min && hr <= zones.easyMax
 }
 
 /**
@@ -89,7 +173,7 @@ export interface LoadPoint {
  */
 export function fitnessFatigue(
   activities: AnalysisActivity[],
-  maxHr: number,
+  profile: HrProfile,
   windowDays = 183,
 ): LoadPoint[] {
   if (activities.length === 0) return []
@@ -100,7 +184,7 @@ export function fitnessFatigue(
     const day = startOfDay(new Date(a.date))
     if (day < firstDay) firstDay = day
     const key = format(day, 'yyyy-MM-dd')
-    dailyTrimp.set(key, (dailyTrimp.get(key) ?? 0) + trimp(a, maxHr))
+    dailyTrimp.set(key, (dailyTrimp.get(key) ?? 0) + trimp(a, zonesOn(profile, a.date).maxHr))
   }
 
   const today = startOfDay(new Date())
@@ -131,34 +215,55 @@ export function acuteChronicRatio(load: LoadPoint[]) {
 
 export interface WeeklyZones {
   weekStart: string // yyyy-MM-dd (Monday)
+  easySec: number
+  moderateSec: number
+  hardSec: number
   easyPct: number
   moderatePct: number
   hardPct: number
+  // Runs this week classified by avg HR because they had no HR stream.
+  fallbackRuns: number
 }
 
-/** Weekly easy/moderate/hard split, % of run time, runs classified by avg HR. */
-export function weeklyZoneDistribution(
+/**
+ * Weekly time spent easy / moderate / hard. Uses per-sample time-in-zone
+ * where a run has an HR stream; otherwise the whole run's duration goes to
+ * the band of its average HR, so no week silently loses time.
+ */
+export function weeklyTimeInZones(
   activities: AnalysisActivity[],
-  maxHr: number,
+  profile: HrProfile,
 ): WeeklyZones[] {
-  const weeks = new Map<string, { easy: number; moderate: number; hard: number }>()
+  const weeks = new Map<string, Record<Effort, number> & { fallbackRuns: number }>()
   for (const a of activities) {
-    if (!a.avgHeartRate) continue
+    if (!a.zoneSeconds && !a.avgHeartRate) continue
     const key = format(startOfWeek(new Date(a.date), { weekStartsOn: 1 }), 'yyyy-MM-dd')
-    const week = weeks.get(key) ?? { easy: 0, moderate: 0, hard: 0 }
-    week[classifyEffort(a.avgHeartRate, maxHr)] += a.duration
+    const week = weeks.get(key) ?? { easy: 0, moderate: 0, hard: 0, fallbackRuns: 0 }
+    if (a.zoneSeconds) {
+      week.easy += a.zoneSeconds.easy
+      week.moderate += a.zoneSeconds.moderate
+      week.hard += a.zoneSeconds.hard
+    } else {
+      week[classifyEffort(a.avgHeartRate!, zonesOn(profile, a.date))] += a.duration
+      week.fallbackRuns++
+    }
     weeks.set(key, week)
   }
 
   return [...weeks.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
+    .filter(([, w]) => w.easy + w.moderate + w.hard > 0)
     .map(([weekStart, w]) => {
       const total = w.easy + w.moderate + w.hard
       return {
         weekStart,
+        easySec: w.easy,
+        moderateSec: w.moderate,
+        hardSec: w.hard,
         easyPct: (w.easy / total) * 100,
         moderatePct: (w.moderate / total) * 100,
         hardPct: (w.hard / total) * 100,
+        fallbackRuns: w.fallbackRuns,
       }
     })
 }

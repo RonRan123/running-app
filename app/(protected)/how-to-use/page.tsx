@@ -63,7 +63,15 @@ export default function HowToUsePage() {
         <p>
           <strong>Heatmap</strong> layers every GPS track you&apos;ve ever recorded onto one map.
           Brighter lines are routes you run often. Use the date slider to watch your territory
-          grow over a season.
+          grow over a season. Your segments show up as blue lines — click one to jump to it.
+        </p>
+        <p>
+          <strong>Segments</strong> are the stretches you run most often, even when they sit
+          inside different routes. The app finds them by overlaying all your runs and spotting
+          where many of them share the same path, then times every pass you&apos;ve made through
+          each one. Open a segment to see whether you&apos;re getting faster on it at the same
+          heart rate, and compare up to five efforts side by side: pace along the stretch drawn
+          over its hill profile, so you can see exactly where one day was quicker than another.
         </p>
         <p>
           <strong>Analysis</strong> is the coaching brain of the app — trends across many runs
@@ -83,9 +91,14 @@ export default function HowToUsePage() {
 
       <Section title="The Analysis page, chart by chart">
         <p className="text-zinc-500">
-          A few terms used throughout: <strong>max HR</strong> is your highest observed heart
-          rate. <strong>Zone 2</strong> means roughly 65–78% of max HR — a genuinely easy,
-          conversational effort. Runs are classified by their average heart rate.
+          A few terms used throughout. Every heart-rate zone comes from the birthday you set in
+          Settings, using your age on the day of each run (so last year&apos;s runs keep last
+          year&apos;s zones): <strong>easy</strong> means at or below your <strong>MAF</strong> target
+          (180 − age), <strong>Zone 2</strong> is the 10 beats just below MAF — a genuinely easy,
+          conversational effort — and <strong>hard</strong> starts at 87% of your age-predicted
+          max (220 − age). <strong>Max HR</strong> is 220 − age, or the highest you&apos;ve
+          actually recorded if that&apos;s higher. Without an age, the app falls back to shares of
+          your highest recorded heart rate.
         </p>
 
         <div className="space-y-5 mt-4">
@@ -129,11 +142,26 @@ export default function HowToUsePage() {
 
           <Chart name="Effort Distribution">
             <p>
-              Each week&apos;s running time split into easy / moderate / hard. The dashed line
-              marks the 75% easy target: decades of coaching practice (and the training of nearly
+              Each week&apos;s running time split into easy / moderate / hard, shown in hours or as
+              a percentage (toggle at the top right). Time is classified second by second from your
+              heart rate, so a run with an easy warm-up and a hard finish is split correctly rather
+              than counted as one effort. In the % view, the dashed line marks the 75% easy target: decades of coaching practice (and the training of nearly
               every elite distance runner) says roughly 75–80% of running should be easy. Weeks
               with a thin green band are the warning sign — usually it means easy runs are being
               run too hard, which blunts recovery without adding fitness.
+            </p>
+          </Chart>
+
+          <Chart name="Running Form">
+            <p>
+              Cadence is how many steps you take per minute (both feet). Step length is how far
+              you travel with each one. Speed is simply the two multiplied, so you can get faster
+              by taking quicker steps, longer steps, or both. The dots are individual runs and the
+              line is a 28-day rolling average. Both numbers naturally rise when you run faster,
+              which is why the chart defaults to easy runs only, so like is compared with like.
+              A slowly rising cadence at the same easy effort is generally a good sign (lighter,
+              quicker steps are easier on the joints); a sudden drop in either can point to
+              fatigue or a niggle worth paying attention to.
             </p>
           </Chart>
 

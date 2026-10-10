@@ -7,6 +7,8 @@ export interface ParsedStreams {
   altitude: number[] | null // meters
   cadence: number[] | null
   distance: number[] | null // cumulative meters
+  latitude: (number | null)[] | null // aligned with time; null = no fix
+  longitude: (number | null)[] | null
 }
 
 export interface ParsedActivity {
@@ -193,6 +195,8 @@ function buildStreams(
     altitude: hasEle ? altitude : null,
     cadence: hasCad ? cadence : null,
     distance,
+    latitude: timed.map(p => p.lat),
+    longitude: timed.map(p => p.lon),
   }
 }
 

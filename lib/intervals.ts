@@ -64,9 +64,11 @@ export interface ActivityStreams {
   altitude: number[] | null // meters
   cadence: number[] | null
   distance: number[] | null // cumulative meters
+  latitude: (number | null)[] | null // aligned with time; null = GPS dropout
+  longitude: (number | null)[] | null
 }
 
-const STREAM_TYPES = ['time', 'heartrate', 'velocity_smooth', 'altitude', 'cadence', 'distance'] as const
+const STREAM_TYPES = ['time', 'heartrate', 'velocity_smooth', 'altitude', 'cadence', 'distance', 'latlng'] as const
 
 /**
  * Fetch raw per-sample streams for a single activity.
@@ -86,6 +88,8 @@ export async function fetchStreams(activityId: string): Promise<ActivityStreams 
   if (!Array.isArray(data)) return null
 
   const byType = new Map<string, number[]>()
+  // The latlng stream carries latitudes in `data` and longitudes in `data2`.
+  let longitude: (number | null)[] | null = null
   for (const s of data) {
     if (
       typeof s === 'object' && s !== null &&
@@ -93,6 +97,10 @@ export async function fetchStreams(activityId: string): Promise<ActivityStreams 
       Array.isArray((s as { data?: unknown }).data)
     ) {
       byType.set((s as { type: string }).type, (s as { data: number[] }).data)
+      const data2 = (s as { data2?: unknown }).data2
+      if ((s as { type: string }).type === 'latlng' && Array.isArray(data2)) {
+        longitude = data2 as (number | null)[]
+      }
     }
   }
 
@@ -106,6 +114,8 @@ export async function fetchStreams(activityId: string): Promise<ActivityStreams 
     altitude: byType.get('altitude') ?? null,
     cadence: byType.get('cadence') ?? null,
     distance: byType.get('distance') ?? null,
+    latitude: longitude ? (byType.get('latlng') ?? null) : null,
+    longitude: byType.get('latlng') ? longitude : null,
   }
 }
 

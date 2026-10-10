@@ -5,10 +5,12 @@ import Link from 'next/link'
 import UnitToggle from '@/components/UnitToggle'
 import { useUnit } from '@/lib/useUnit'
 import { formatDistance, formatDuration, formatPace } from '@/lib/units'
-import { mafTarget, timeInZones, type RunStreams, type Split } from '@/lib/runAnalysis'
+import { timeInZones, type RunStreams, type Split } from '@/lib/runAnalysis'
+import type { HrZones } from '@/lib/analysis'
 import HrChart from './HrChart'
 import PaceChart from './PaceChart'
 import ElevationChart from './ElevationChart'
+import CadenceChart from './CadenceChart'
 import SplitsTable from './SplitsTable'
 import ZoneBar from './ZoneBar'
 
@@ -26,25 +28,23 @@ export default function RunDeepDive({
   splitsMi,
   splitsKm,
   trimp,
-  maxHr,
-  initialAge,
+  zones: hrZones,
 }: {
   activity: RunDeepDiveActivity
   streams: RunStreams | null
   splitsMi: Split[]
   splitsKm: Split[]
   trimp: number | null
-  maxHr: number
-  initialAge: number | null
+  zones: HrZones
 }) {
   const { unit, changeUnit } = useUnit()
 
-  // Age is configured once in Settings → Training; 180 − age is the MAF band.
-  const maf = initialAge != null ? mafTarget(initialAge) : null
+  // Age is configured once in Settings → Training; it sets the MAF band and all zones.
+  const maf = hrZones.maf
 
   const zones = useMemo(
-    () => streams?.heartrate ? timeInZones(streams.time, streams.heartrate, maxHr) : null,
-    [streams, maxHr],
+    () => streams?.heartrate ? timeInZones(streams.time, streams.heartrate, hrZones) : null,
+    [streams, hrZones],
   )
 
   const stats = [
@@ -89,12 +89,13 @@ export default function RunDeepDive({
 
       {streams ? (
         <>
-          <HrChart streams={streams} maf={maf} maxHr={maxHr} />
+          <HrChart streams={streams} maf={maf} maxHr={hrZones.maxHr} />
           <div className="grid gap-6 lg:grid-cols-2">
             <PaceChart streams={streams} unit={unit} />
             <ElevationChart streams={streams} unit={unit} />
           </div>
-          {zones ? <ZoneBar zones={zones} maxHr={maxHr} /> : null}
+          <CadenceChart streams={streams} unit={unit} />
+          {zones ? <ZoneBar zones={zones} hrZones={hrZones} /> : null}
           <SplitsTable splits={unit === 'mi' ? splitsMi : splitsKm} unit={unit} />
         </>
       ) : (

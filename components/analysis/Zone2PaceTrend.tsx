@@ -10,7 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import { format } from 'date-fns'
-import { isZone2, type AnalysisActivity } from '@/lib/analysis'
+import { isZone2, zonesOn, type AnalysisActivity, type HrProfile } from '@/lib/analysis'
 import { KM_PER_MILE, formatPace, type Unit } from '@/lib/units'
 import ChartCard, { ChartEmpty } from './ChartCard'
 
@@ -24,15 +24,15 @@ interface Point {
 
 export default function Zone2PaceTrend({
   activities,
-  maxHr,
+  profile,
   unit,
 }: {
   activities: AnalysisActivity[]
-  maxHr: number
+  profile: HrProfile
   unit: Unit
 }) {
   const points: Point[] = activities
-    .filter(a => a.avgPace && a.avgHeartRate && isZone2(a.avgHeartRate, maxHr))
+    .filter(a => a.avgPace && a.avgHeartRate && isZone2(a.avgHeartRate, zonesOn(profile, a.date)))
     .map(a => ({
       ts: new Date(a.date).getTime(),
       name: a.name,
@@ -41,6 +41,8 @@ export default function Zone2PaceTrend({
       hr: a.avgHeartRate as number,
     }))
     .sort((a, b) => a.ts - b.ts)
+
+  const current = zonesOn(profile, new Date())
 
   function formatTick(pace: number) {
     const m = Math.floor(pace)
@@ -51,7 +53,7 @@ export default function Zone2PaceTrend({
   return (
     <ChartCard
       title="Aerobic Pace"
-      subtitle="Average pace of easy (Zone 2) runs in the selected range. The axis is flipped so an upward trend = faster easy pace — the number that predicts marathon potential."
+      subtitle={`Average pace of easy (Zone 2) runs in the selected range — currently ${current.zone2Min}–${current.easyMax} bpm, with each run judged by your zones on its date. The axis is flipped so an upward trend = faster easy pace — the number that predicts marathon potential.`}
     >
       {points.length < 3 ? (
         <ChartEmpty message="Need at least 3 easy (Zone 2) runs with pace and HR data in this date range." />

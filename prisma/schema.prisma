@@ -22,6 +22,7 @@ model Activity {
   externalId   String?         @unique
   createdAt    DateTime        @default(now())
   stream       ActivityStream?
+  efforts      SegmentEffort[]
 
   // Weather at run time (Open-Meteo historical archive). weatherFetchedAt is
   // stamped on every fetch *attempt* — success or definitive failure — so
@@ -44,13 +45,21 @@ model ActivityStream {
   altitude   Json? // meters
   cadence    Json?
   distance   Json? // cumulative meters
+  // Time-aligned GPS: (number | null)[] index-matched with `time`; null
+  // entries are GPS dropouts. Activity.coordinates drops those samples, so
+  // only these columns can time a segment effort.
+  latitude   Json?
+  longitude  Json?
   fetchedAt  DateTime @default(now())
 }
 
 // Single-row settings table (id is always 1)
 model UserSettings {
   id  Int  @id @default(1)
-  age Int?
+  age Int? // legacy fallback; birthDate takes precedence
+  // Heart-rate zones use the age on each run's date, so past runs keep the
+  // zones they were run under as the runner gets older. Stored as UTC midnight.
+  birthDate DateTime?
 
   // Date window the demo account is allowed to see. Null = fall back to the
   // default window hardcoded in lib/activities.ts.
@@ -75,4 +84,39 @@ model LoginEvent {
   country   String?
   region    String?
   city      String?
+}
+
+// A stretch run many times across different routes, found automatically by
+// lib/segments/discover.ts (or pinned/renamed by the user).
+model Segment {
+  id        String          @id @default(cuid())
+  name      String
+  geometry  Json // {lat, lng}[] resampled every 10 m, in running direction
+  lengthM   Float
+  elevation Json? // meters, aligned with geometry; null until computed
+  strength  Int // distinct runs with a full effort
+  pinned    Boolean         @default(false)
+  renamed   Boolean         @default(false) // name chosen by the user
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  efforts   SegmentEffort[]
+}
+
+// One pass through a segment. A run can have several (laps, repeats).
+model SegmentEffort {
+  id           String   @id @default(cuid())
+  segmentId    String
+  segment      Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  activityId   String
+  activity     Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  startIndex   Int // stream sample indices bracketing the effort
+  endIndex     Int
+  startSec     Float // interpolated crossing times, seconds from run start
+  endSec       Float
+  elapsedSec   Float
+  avgHeartRate Float?
+  date         DateTime // copied from Activity for date-window filtering
+
+  @@unique([segmentId, activityId, startIndex])
+  @@index([activityId])
 }

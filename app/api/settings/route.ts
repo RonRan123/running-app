@@ -9,6 +9,7 @@ export async function GET() {
   const settings = await prisma.userSettings.findUnique({ where: { id: 1 } })
   return Response.json({
     age: settings?.age ?? null,
+    birthDate: settings?.birthDate?.toISOString().slice(0, 10) ?? null,
     demoFromDate: settings?.demoFromDate?.toISOString() ?? null,
     demoToDate: settings?.demoToDate?.toISOString() ?? null,
   })
@@ -22,7 +23,18 @@ export async function PUT(request: Request) {
   }
 
   const body = await request.json().catch(() => null)
-  const update: { age?: number; demoFromDate?: Date; demoToDate?: Date } = {}
+  const update: { age?: number; birthDate?: Date; demoFromDate?: Date; demoToDate?: Date } = {}
+
+  // Birthday as yyyy-MM-dd, stored at UTC midnight so the calendar date never shifts.
+  if (body?.birthDate !== undefined) {
+    const match = typeof body.birthDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.birthDate)
+    const birthDate = match ? new Date(`${body.birthDate}T00:00:00Z`) : null
+    const years = birthDate ? (Date.now() - birthDate.getTime()) / (365.25 * 86_400_000) : NaN
+    if (!birthDate || isNaN(birthDate.getTime()) || years < 10 || years > 100) {
+      return Response.json({ error: 'Enter a valid birthday (age 10–100)' }, { status: 400 })
+    }
+    update.birthDate = birthDate
+  }
 
   if (body?.age !== undefined) {
     const age = Number(body.age)
@@ -59,6 +71,7 @@ export async function PUT(request: Request) {
   })
   return Response.json({
     age: settings.age,
+    birthDate: settings.birthDate?.toISOString().slice(0, 10) ?? null,
     demoFromDate: settings.demoFromDate?.toISOString() ?? null,
     demoToDate: settings.demoToDate?.toISOString() ?? null,
   })

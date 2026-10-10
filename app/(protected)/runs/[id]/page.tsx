@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import type { Session } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { findActivities, findActivityById } from '@/lib/activities'
+import { effortWhere, findActivities, findActivityById } from '@/lib/activities'
 import { notFound } from 'next/navigation'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -10,8 +10,9 @@ import RouteMap, { type RoutePoint } from '@/components/RouteMap'
 import RunDetailStats from '@/components/RunDetailStats'
 import WeatherBadge from '@/components/WeatherBadge'
 import RunDeepDive from '@/components/deepdive/RunDeepDive'
+import RunSegmentEfforts, { type RunEffort } from '@/components/segments/RunSegmentEfforts'
 import { bestEfforts, type EffortActivity } from '@/lib/records'
-import { estimateMaxHr, trimp } from '@/lib/analysis'
+import { hrProfile, trimp, zonesOn } from '@/lib/analysis'
 import { computeSplits, downsampleStreams, type RunStreams } from '@/lib/runAnalysis'
 import { KM_PER_MILE } from '@/lib/units'
 
@@ -81,6 +82,33 @@ export default async function RunDetailPage({
   if (!activity) notFound()
 
   const coordinates = parseCoordinates(activity.coordinates as unknown)
+
+  // Segment efforts in this run, ranked against every effort on that segment
+  // the viewer can see (the demo window applies to the ranking too).
+  const runEfforts = await prisma.segmentEffort.findMany({
+    where: { activityId: id },
+    orderBy: { startSec: 'asc' },
+    include: { segment: { select: { id: true, name: true, lengthM: true } } },
+  })
+  const segmentEfforts: RunEffort[] = await Promise.all(
+    runEfforts.map(async e => {
+      const [faster, of] = await Promise.all([
+        prisma.segmentEffort.count({
+          where: await effortWhere(session, { segmentId: e.segmentId, elapsedSec: { lt: e.elapsedSec } }),
+        }),
+        prisma.segmentEffort.count({ where: await effortWhere(session, { segmentId: e.segmentId }) }),
+      ])
+      return {
+        id: e.id,
+        segmentId: e.segment.id,
+        segmentName: e.segment.name,
+        lengthM: e.segment.lengthM,
+        elapsedSec: e.elapsedSec,
+        rank: faster + 1,
+        of,
+      }
+    }),
+  )
   const prLabels = await currentPrLabels(session, id)
 
   // Build stream data for deep dive
@@ -100,9 +128,10 @@ export default async function RunDetailPage({
   }
 
   const analysisActivities = allActivities.map(a => ({ ...a, date: a.date.toISOString() }))
-  const maxHr = estimateMaxHr(analysisActivities)
+  // Zones as they were on the day of this run (age on that date).
+  const zones = zonesOn(hrProfile(settings, analysisActivities), activity.date)
   const activityForTrimp = { ...activity, date: activity.date.toISOString(), avgPace: activity.avgPace, avgHeartRate: activity.avgHeartRate, maxHeartRate: activity.maxHeartRate, name: activity.name }
-  const runTrimp = activity.avgHeartRate ? trimp(activityForTrimp, maxHr) : null
+  const runTrimp = activity.avgHeartRate ? trimp(activityForTrimp, zones.maxHr) : null
 
   const splitsMi = streams ? computeSplits(streams, KM_PER_MILE * 1000) : []
   const splitsKm = streams ? computeSplits(streams, 1000) : []
@@ -172,6 +201,8 @@ export default async function RunDetailPage({
         </div>
       ) : null}
 
+      <RunSegmentEfforts efforts={segmentEfforts} />
+
       {/* Deep Dive */}
       <RunDeepDive
         activity={{
@@ -185,8 +216,7 @@ export default async function RunDetailPage({
         splitsMi={splitsMi}
         splitsKm={splitsKm}
         trimp={runTrimp}
-        maxHr={maxHr}
-        initialAge={settings?.age ?? null}
+        zones={zones}
       />
     </div>
   )
