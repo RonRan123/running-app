@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { findActivities } from '@/lib/activities'
 import AnalysisView from '@/components/analysis/AnalysisView'
-import { hrZones } from '@/lib/analysis'
+import { hrProfile, zonesOn } from '@/lib/analysis'
 import { prisma } from '@/lib/prisma'
 import { runningForm, timeInZones } from '@/lib/runAnalysis'
 
@@ -32,16 +32,17 @@ export default async function AnalysisPage() {
   })
 
   // Time-in-zone and running form are computed from streams here so raw
-  // streams never ship to the client. Zones come from the age in Settings → Training.
-  const zones = hrZones(settings?.age, activities)
+  // streams never ship to the client. Zones use the runner's age on each
+  // run's date (birthday in Settings → Training).
+  const profile = hrProfile(settings, activities)
 
   return (
     <AnalysisView
-      zones={zones}
+      profile={profile}
       activities={activities.map(({ stream, ...a }) => {
         const time = stream?.time as number[] | undefined
         const hr = stream?.heartrate as number[] | null | undefined
-        const secs = time && hr && hr.length === time.length ? timeInZones(time, hr, zones) : null
+        const secs = time && hr && hr.length === time.length ? timeInZones(time, hr, zonesOn(profile, a.date)) : null
         // An HR stream with no usable samples falls back to avg-HR classification.
         const hasTime = secs && secs.easy + secs.moderate + secs.hard > 0
         const cadence = stream?.cadence as number[] | null | undefined

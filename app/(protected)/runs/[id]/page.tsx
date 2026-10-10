@@ -12,7 +12,7 @@ import WeatherBadge from '@/components/WeatherBadge'
 import RunDeepDive from '@/components/deepdive/RunDeepDive'
 import RunSegmentEfforts, { type RunEffort } from '@/components/segments/RunSegmentEfforts'
 import { bestEfforts, type EffortActivity } from '@/lib/records'
-import { hrZones, trimp } from '@/lib/analysis'
+import { hrProfile, trimp, zonesOn } from '@/lib/analysis'
 import { computeSplits, downsampleStreams, type RunStreams } from '@/lib/runAnalysis'
 import { KM_PER_MILE } from '@/lib/units'
 
@@ -128,7 +128,8 @@ export default async function RunDetailPage({
   }
 
   const analysisActivities = allActivities.map(a => ({ ...a, date: a.date.toISOString() }))
-  const zones = hrZones(settings?.age, analysisActivities)
+  // Zones as they were on the day of this run (age on that date).
+  const zones = zonesOn(hrProfile(settings, analysisActivities), activity.date)
   const activityForTrimp = { ...activity, date: activity.date.toISOString(), avgPace: activity.avgPace, avgHeartRate: activity.avgHeartRate, maxHeartRate: activity.maxHeartRate, name: activity.name }
   const runTrimp = activity.avgHeartRate ? trimp(activityForTrimp, zones.maxHr) : null
 

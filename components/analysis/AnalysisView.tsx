@@ -12,7 +12,8 @@ import {
   weeklyVolume,
   weeklyTimeInZones,
   type AnalysisActivity,
-  type HrZones,
+  type HrProfile,
+  zonesOn,
 } from '@/lib/analysis'
 import AerobicScatter from './AerobicScatter'
 import EfficiencyTrend from './EfficiencyTrend'
@@ -27,10 +28,10 @@ import Zone2PaceTrend from './Zone2PaceTrend'
 
 export default function AnalysisView({
   activities,
-  zones,
+  profile,
 }: {
   activities: AnalysisActivity[]
-  zones: HrZones
+  profile: HrProfile
 }) {
   const { unit, changeUnit } = useUnit()
 
@@ -58,9 +59,10 @@ export default function AnalysisView({
     })
   }, [activities, range])
 
-  const weeklyZones = useMemo(() => weeklyTimeInZones(inRange, zones), [inRange, zones])
+  const zones = useMemo(() => zonesOn(profile, today), [profile, today])
+  const weeklyZones = useMemo(() => weeklyTimeInZones(inRange, profile), [inRange, profile])
   const weeklyVol = useMemo(() => weeklyVolume(inRange, range.from, range.to), [inRange, range])
-  const load = useMemo(() => fitnessFatigue(activities, zones.maxHr), [activities, zones])
+  const load = useMemo(() => fitnessFatigue(activities, profile), [activities, profile])
   const loadRatio = useMemo(() => acuteChronicRatio(load), [load])
   const longRuns = useMemo(() => longRunByWeek(activities), [activities])
 
@@ -72,7 +74,9 @@ export default function AnalysisView({
           <p className="text-sm text-zinc-500 mt-0.5">
             {inRange.length} {inRange.length === 1 ? 'run' : 'runs'} in the selected range · easy ≤{' '}
             {zones.easyMax}, hard ≥ {zones.hardMin} bpm
-            {zones.basis === 'age' ? ' (from your age)' : ' (from your highest recorded HR — set your age in Settings)'}
+            {zones.basis === 'age'
+              ? ` today (age ${zones.age}); each run uses your age on its date`
+              : ' (from your highest recorded HR — set your birthday in Settings)'}
           </p>
         </div>
         <UnitToggle unit={unit} onChange={changeUnit} />
@@ -92,10 +96,10 @@ export default function AnalysisView({
       <AerobicScatter activities={inRange} unit={unit} />
       <div className="grid gap-6 lg:grid-cols-2">
         <EfficiencyTrend activities={inRange} />
-        <Zone2PaceTrend activities={inRange} zones={zones} unit={unit} />
+        <Zone2PaceTrend activities={inRange} profile={profile} unit={unit} />
       </div>
       <ZoneDistribution weekly={weeklyZones} />
-      <RunningForm activities={inRange} zones={zones} unit={unit} />
+      <RunningForm activities={inRange} profile={profile} unit={unit} />
       <WeatherPerformance activities={inRange} unit={unit} />
 
       {/* Training load — fixed windows, independent of the slider */}

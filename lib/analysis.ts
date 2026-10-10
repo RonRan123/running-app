@@ -37,7 +37,9 @@ export type Effort = 'easy' | 'moderate' | 'hard'
 /**
  * Heart-rate zones used everywhere in the app (bpm, inclusive bounds).
  *
- * With an age set (Settings → Training) the zones are MAF-anchored:
+ * Zones depend on age *on the day of the run* (from the birthday in
+ * Settings → Training), so getting older never rewrites past runs.
+ * With an age the zones are MAF-anchored:
  *   easy     ≤ MAF (180 − age)
  *   Zone 2   MAF − 10 … MAF
  *   hard     ≥ 87 % of age-predicted max (220 − age)
@@ -45,16 +47,24 @@ export type Effort = 'easy' | 'moderate' | 'hard'
  * and max HR (for training load and "% of max") is 220 − age, or the highest
  * recorded max if that is higher.
  *
- * Without an age they fall back to fixed shares of the highest recorded max
- * HR: easy ≤ 78 %, Zone 2 65–78 %, hard > 87 %.
+ * Without a birthday (or legacy age) they fall back to fixed shares of the
+ * highest recorded max HR: easy ≤ 78 %, Zone 2 65–78 %, hard > 87 %.
  */
 export interface HrZones {
   basis: 'age' | 'recorded'
+  age: number | null
   maf: number | null
   maxHr: number
   zone2Min: number
   easyMax: number
   hardMin: number
+}
+
+/** Everything needed to work out zones for any date; serializable for client components. */
+export interface HrProfile {
+  birthDate: string | null // yyyy-MM-dd
+  age: number | null // legacy fixed age, used only without a birthDate
+  recordedMax: number
 }
 
 /** Maffetone target HR: 180 − age. */
@@ -66,37 +76,56 @@ const HARD_SHARE = 0.87
 const EASY_SHARE = 0.78
 const ZONE2_SHARE = 0.65
 
-function recordedMaxHr(activities: Pick<AnalysisActivity, 'maxHeartRate'>[]) {
-  return activities.reduce((max, a) => Math.max(max, a.maxHeartRate ?? 0), 0)
+export function hrProfile(
+  settings: { birthDate?: Date | null; age?: number | null } | null | undefined,
+  activities: Pick<AnalysisActivity, 'maxHeartRate'>[],
+): HrProfile {
+  return {
+    birthDate: settings?.birthDate ? settings.birthDate.toISOString().slice(0, 10) : null,
+    age: settings?.age ?? null,
+    recordedMax: activities.reduce((max, a) => Math.max(max, a.maxHeartRate ?? 0), 0),
+  }
 }
 
-export function hrZones(
-  age: number | null | undefined,
-  activities: Pick<AnalysisActivity, 'maxHeartRate'>[],
-): HrZones {
-  const recorded = recordedMaxHr(activities)
+/** Whole years old on `date` (calendar comparison in UTC), or null if unknown. */
+export function ageOn(profile: HrProfile, date: Date | string): number | null {
+  if (!profile.birthDate) return profile.age
+  const [by, bm, bd] = profile.birthDate.split('-').map(Number)
+  const d = new Date(date)
+  const y = d.getUTCFullYear()
+  const beforeBirthday = d.getUTCMonth() + 1 < bm || (d.getUTCMonth() + 1 === bm && d.getUTCDate() < bd)
+  return y - by - (beforeBirthday ? 1 : 0)
+}
+
+export function zonesForAge(age: number | null, recordedMax: number): HrZones {
   if (age != null && age > 0) {
     const maf = mafTarget(age)
     const predicted = 220 - age
-    const hardMin = Math.max(maf + 2, Math.round(predicted * HARD_SHARE))
     return {
       basis: 'age',
+      age,
       maf,
-      maxHr: Math.max(predicted, recorded),
+      maxHr: Math.max(predicted, recordedMax),
       zone2Min: maf - 10,
       easyMax: maf,
-      hardMin,
+      hardMin: Math.max(maf + 2, Math.round(predicted * HARD_SHARE)),
     }
   }
-  const maxHr = recorded > 120 ? recorded : DEFAULT_MAX_HR
+  const maxHr = recordedMax > 120 ? recordedMax : DEFAULT_MAX_HR
   return {
     basis: 'recorded',
+    age: null,
     maf: null,
     maxHr,
     zone2Min: Math.ceil(maxHr * ZONE2_SHARE),
     easyMax: Math.floor(maxHr * EASY_SHARE),
     hardMin: Math.floor(maxHr * HARD_SHARE) + 1,
   }
+}
+
+/** Zones in force on a given date (e.g. a run's date). */
+export function zonesOn(profile: HrProfile, date: Date | string): HrZones {
+  return zonesForAge(ageOn(profile, date), profile.recordedMax)
 }
 
 export function classifyEffort(hr: number, zones: HrZones): Effort {
@@ -144,7 +173,7 @@ export interface LoadPoint {
  */
 export function fitnessFatigue(
   activities: AnalysisActivity[],
-  maxHr: number,
+  profile: HrProfile,
   windowDays = 183,
 ): LoadPoint[] {
   if (activities.length === 0) return []
@@ -155,7 +184,7 @@ export function fitnessFatigue(
     const day = startOfDay(new Date(a.date))
     if (day < firstDay) firstDay = day
     const key = format(day, 'yyyy-MM-dd')
-    dailyTrimp.set(key, (dailyTrimp.get(key) ?? 0) + trimp(a, maxHr))
+    dailyTrimp.set(key, (dailyTrimp.get(key) ?? 0) + trimp(a, zonesOn(profile, a.date).maxHr))
   }
 
   const today = startOfDay(new Date())
@@ -203,7 +232,7 @@ export interface WeeklyZones {
  */
 export function weeklyTimeInZones(
   activities: AnalysisActivity[],
-  zones: HrZones,
+  profile: HrProfile,
 ): WeeklyZones[] {
   const weeks = new Map<string, Record<Effort, number> & { fallbackRuns: number }>()
   for (const a of activities) {
@@ -215,7 +244,7 @@ export function weeklyTimeInZones(
       week.moderate += a.zoneSeconds.moderate
       week.hard += a.zoneSeconds.hard
     } else {
-      week[classifyEffort(a.avgHeartRate!, zones)] += a.duration
+      week[classifyEffort(a.avgHeartRate!, zonesOn(profile, a.date))] += a.duration
       week.fallbackRuns++
     }
     weeks.set(key, week)
