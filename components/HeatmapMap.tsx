@@ -11,6 +11,32 @@ interface GeoActivity {
   coordinates: { lat: number; lng: number }[]
 }
 
+interface SegmentOverlay {
+  id: string
+  name: string
+  lengthM: number
+  efforts: number
+  geometry: { lat: number; lng: number }[]
+}
+
+/** Popup body built from DOM nodes — segment names are user-editable text. */
+function segmentPopup(seg: SegmentOverlay) {
+  const root = document.createElement('div')
+  root.style.cssText = 'font: 12px system-ui; color: #18181b; min-width: 150px'
+  const title = document.createElement('p')
+  title.style.cssText = 'font-weight: 600; margin: 0'
+  title.textContent = seg.name
+  const meta = document.createElement('p')
+  meta.style.cssText = 'color: #71717a; margin: 2px 0 6px'
+  meta.textContent = `${(seg.lengthM / 1000).toFixed(2)} km · ${seg.efforts} ${seg.efforts === 1 ? 'effort' : 'efforts'}`
+  const link = document.createElement('a')
+  link.href = `/segments/${seg.id}`
+  link.textContent = 'View efforts →'
+  link.style.cssText = 'font-weight: 500; color: #18181b; text-decoration: underline'
+  root.append(title, meta, link)
+  return root
+}
+
 interface Track {
   ts: number
   coordinates: [number, number][]
@@ -39,6 +65,7 @@ export default function HeatmapMap() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
   const [message, setMessage] = useState<string | null>(null)
   const [tracks, setTracks] = useState<Track[]>([])
+  const [segmentCount, setSegmentCount] = useState(0)
   // null = all-time (the default view)
   const [range, setRange] = useState<{ from: Date; to: Date } | null>(null)
 
@@ -69,9 +96,14 @@ export default function HeatmapMap() {
     let cancelled = false
 
     ;(async () => {
-      const res = await fetch('/api/activities/geo')
+      const [res, segRes] = await Promise.all([
+        fetch('/api/activities/geo'),
+        fetch('/api/segments').catch(() => null),
+      ])
       if (!res.ok) throw new Error(`Failed to load tracks (${res.status})`)
       const activities: GeoActivity[] = await res.json()
+      // Segments are an overlay — a failure here never blocks the heatmap.
+      const segments: SegmentOverlay[] = segRes?.ok ? await segRes.json().catch(() => []) : []
       if (cancelled || !containerRef.current) return
 
       const loaded: Track[] = activities
@@ -148,6 +180,41 @@ export default function HeatmapMap() {
           },
         })
 
+        if (segments.length > 0) {
+          map.addSource('segments', {
+            type: 'geojson',
+            data: {
+              type: 'FeatureCollection',
+              features: segments.map(seg => ({
+                type: 'Feature',
+                properties: { id: seg.id },
+                geometry: {
+                  type: 'LineString',
+                  coordinates: seg.geometry.map(p => [p.lng, p.lat]),
+                },
+              })),
+            },
+          })
+          map.addLayer({
+            id: 'segments-line',
+            type: 'line',
+            source: 'segments',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#38bdf8', 'line-width': 4, 'line-opacity': 0.9 },
+          })
+          map.on('click', 'segments-line', e => {
+            const seg = segments.find(x => x.id === e.features?.[0]?.properties?.id)
+            if (!seg) return
+            new mapboxgl.Popup({ closeButton: true, maxWidth: '240px' })
+              .setLngLat(e.lngLat)
+              .setDOMContent(segmentPopup(seg))
+              .addTo(map)
+          })
+          map.on('mouseenter', 'segments-line', () => (map.getCanvas().style.cursor = 'pointer'))
+          map.on('mouseleave', 'segments-line', () => (map.getCanvas().style.cursor = ''))
+          setSegmentCount(segments.length)
+        }
+
         setStatus('ready')
       })
     })().catch(err => {
@@ -194,9 +261,15 @@ export default function HeatmapMap() {
           )}
         </div>
       )}
-      {status === 'ready' && range && (
+      {status === 'ready' && (range || segmentCount > 0) && (
         <p className="text-xs text-zinc-500">
-          Showing {visibleTracks.length} of {tracks.length} runs with GPS.
+          {range && `Showing ${visibleTracks.length} of ${tracks.length} runs with GPS. `}
+          {segmentCount > 0 && (
+            <>
+              <span className="inline-block h-0.5 w-4 align-middle bg-sky-400 mr-1" />
+              Blue lines are your {segmentCount} segments — click one to see its efforts.
+            </>
+          )}
         </p>
       )}
 

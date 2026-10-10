@@ -439,6 +439,15 @@ Routes are rarely repeated whole (runs get spliced together from familiar pieces
 *Validation before UI*
 - [ ] Run discovery on real data and render the top ~10 candidates on a static map for review; tune `MIN_RUNS`, `MIN_LENGTH`, cell size and split threshold before building the pages
 
+*Implementation notes (as built, 2026-10-09). These differ from the plan above:*
+- Effort endpoint radius is 50 m, not 30 m. On real data a run cutting a corner passed the start at 41 m
+- Discovery over-counts: a run that turns off just before the end still "supports" the stretch. So a pool of 15 discovered candidates is re-ranked by matched efforts and the top 5 kept. Stored strength = distinct runs with a full matched effort
+- Speed along the segment uses a monotone dynamic-programming alignment of GPS samples to the segment (not greedy nearest-point projection, which broke on GPS wobble at stops and corners). Binned every 20 m and smoothed over 100 m as distance ÷ time
+- Segments whose runs have no altitude stream get their elevation profile from Open-Meteo's elevation API (Copernicus 90 m DEM)
+- "Rediscover" lives on the /segments page (admin only) rather than in Settings
+- Grade-adjusted pace and EF per effort are not shown yet. Effort table has time, pace, avg HR, feels-like temp, rank
+- First run on real data: Hudson River Greenway 1.3 km (18 runs), Ashburn 1.4 km (10), Belmont Ridge 1.7 km (9), Central Park east 1.4 km (9), Ashburn 0.9 km (9)
+
 *Prior art: how this approach compares (researched 2026-10-09)*
 - **`tracematch` / Veloq** (open source, built for Intervals.icu users: github.com/evanjt/tracematch): nearly the same pipeline. It rasterises tracks into a grid, keeps "hot" cells above a support floor, splits corridors where the *set of activities* passing changes, uses the medoid trace as geometry, and emits sections best-first with already-covered ground excluded. Route matching uses Average Minimum Distance, run both ways to catch subsets. Reported ~3 s for 426 tracks
 - **Refinements adopted from it:**

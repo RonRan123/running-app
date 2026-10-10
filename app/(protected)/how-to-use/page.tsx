@@ -63,7 +63,15 @@ export default function HowToUsePage() {
         <p>
           <strong>Heatmap</strong> layers every GPS track you&apos;ve ever recorded onto one map.
           Brighter lines are routes you run often. Use the date slider to watch your territory
-          grow over a season.
+          grow over a season. Your segments show up as blue lines — click one to jump to it.
+        </p>
+        <p>
+          <strong>Segments</strong> are the stretches you run most often, even when they sit
+          inside different routes. The app finds them by overlaying all your runs and spotting
+          where many of them share the same path, then times every pass you&apos;ve made through
+          each one. Open a segment to see whether you&apos;re getting faster on it at the same
+          heart rate, and compare up to five efforts side by side: pace along the stretch drawn
+          over its hill profile, so you can see exactly where one day was quicker than another.
         </p>
         <p>
           <strong>Analysis</strong> is the coaching brain of the app — trends across many runs
