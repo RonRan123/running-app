@@ -383,61 +383,61 @@ A single explanatory page that gives any user — including the demo account —
 **Sync shows the latest run immediately (bug fix)**
 
 Root cause: every login fires a background `runSync()` (`lib/auth.ts` `signIn` event) that isn't awaited. The runs page renders before it finishes, so the new run isn't in the list. When Sync is then clicked, the background sync has already stored it, `/api/sync` returns `synced: 0`, and `SyncButton` only calls `router.refresh()` when `synced > 0` — so the list never re-renders.
-- [ ] `SyncButton` calls `router.refresh()` after **every** successful sync, not only when `synced > 0`
-- [ ] Change the `synced === 0` message from "Already up to date" to "Up to date". The login sync may have just pulled in a new run, so "already" is misleading
-- [ ] Guard against the login sync and a manual sync racing: concurrent `prisma.activity.create` on the same `externalId` hits the unique constraint and currently surfaces as a 502. Treat a P2002 unique violation in `runSync` as "skipped", not a failure
-- [ ] Verify against Next 16 `router.refresh()` semantics (read `node_modules/next/dist/docs/` first) — the runs page must re-run its server query, not serve a cached RSC payload
+- [x] `SyncButton` calls `router.refresh()` after **every** successful sync, not only when `synced > 0`
+- [x] Change the `synced === 0` message from "Already up to date" to "Up to date". The login sync may have just pulled in a new run, so "already" is misleading
+- [x] Guard against the login sync and a manual sync racing: concurrent `prisma.activity.create` on the same `externalId` hits the unique constraint and currently surfaces as a 502. Treat a P2002 unique violation in `runSync` as "skipped", not a failure
+- [x] Verify against Next 16 `router.refresh()` semantics (read `node_modules/next/dist/docs/` first) — the runs page must re-run its server query, not serve a cached RSC payload
 
 **Weekly time spent easy / moderate / hard**
 
 The existing Effort Distribution chart classifies a *whole run* by its average HR and shows only percentages. Now that `ActivityStream.heartrate` is stored, use true per-sample time-in-zone.
-- [ ] New `weeklyTimeInZones()` in `lib/analysis.ts`, reusing `timeInZones()` from `lib/runAnalysis.ts` (same `EASY_CEILING` / `MODERATE_CEILING` bands) per run, summed per Monday-start week
-- [ ] Runs without an HR stream fall back to the current avg-HR whole-run classification so no week silently loses time; tooltip notes how many runs used the fallback
-- [ ] Chart shows **absolute time** (hours/minutes stacked: easy / moderate / hard) with a toggle to the existing **% view**; the 75 % easy target line only appears in % view
-- [ ] Replaces the current `ZoneDistribution` chart (no duplicate cards); respects the Analysis date-range slider and the demo date window (streams loaded via `findActivities` include, never `prisma.activity` directly)
-- [ ] Payload: compute zone totals server-side in `analysis/page.tsx` — don't ship raw HR streams to the client
-- [ ] Update the Effort Distribution section of `/how-to-use`
+- [x] New `weeklyTimeInZones()` in `lib/analysis.ts`, reusing `timeInZones()` from `lib/runAnalysis.ts` (same `EASY_CEILING` / `MODERATE_CEILING` bands) per run, summed per Monday-start week
+- [x] Runs without an HR stream fall back to the current avg-HR whole-run classification so no week silently loses time; tooltip notes how many runs used the fallback
+- [x] Chart shows **absolute time** (hours/minutes stacked: easy / moderate / hard) with a toggle to the existing **% view**; the 75 % easy target line only appears in % view
+- [x] Replaces the current `ZoneDistribution` chart (no duplicate cards); respects the Analysis date-range slider and the demo date window (streams loaded via `findActivities` include, never `prisma.activity` directly)
+- [x] Payload: compute zone totals server-side in `analysis/page.tsx` — don't ship raw HR streams to the client
+- [x] Update the Effort Distribution section of `/how-to-use`
 
 **Auto-discovered segments: top 5 most-run stretches**
 
 Routes are rarely repeated whole (runs get spliced together from familiar pieces), so the unit of comparison is the **segment**, a stretch run many times across different routes. Segments are discovered automatically by overlaying every GPS run and measuring where they overlap.
 
 *Prerequisite: time-aligned GPS*
-- [ ] Verify whether Intervals.icu `/map` coordinates are index-aligned with `ActivityStream.time`. If not, fetch the `latlng` stream (`data` = lats, `data2` = lngs) instead, store it time-aligned, and re-fetch once for existing runs. Discovery doesn't need timestamps, but timing efforts does. GPX/FIT uploads are already aligned
+- [x] Verify whether Intervals.icu `/map` coordinates are index-aligned with `ActivityStream.time`. If not, fetch the `latlng` stream (`data` = lats, `data2` = lngs) instead, store it time-aligned, and re-fetch once for existing runs. Discovery doesn't need timestamps, but timing efforts does. GPX/FIT uploads are already aligned
 
 *Discovery (`lib/segments/discover.ts`, pure functions, unit-tested)*
-1. [ ] **Resample** every GPS run to one point per 10 m along its path (local metric projection), so recording rate doesn't bias anything
-2. [ ] **Overlay on a grid** of ~20 m cells. Each run marks the cells it passes through **plus their immediate neighbours**, which absorbs GPS noise so the same path on different days lands in the same cells. Counts are *distinct runs* per cell, so laps don't inflate a cell
-3. [ ] **Hot cells** = cells touched by ≥ `MIN_RUNS` runs (start at 5)
-4. [ ] **Candidate stretches**: walk each run's resampled path and cut out the maximal stretches that stay in hot cells (bridging gaps < 50 m), keeping those ≥ `MIN_LENGTH` (start at 800 m)
-5. [ ] **Split at junctions**: along each candidate, cut where the set of runs passing changes (Jaccard similarity of run sets drops below ~0.7; a branch joins or peels off). Each piece then has roughly uniform traffic and ends at a natural decision point
-6. [ ] **Merge duplicates**: candidates from different runs describing the same stretch (ends within 50 m, ≥ 90 % shape overlap) collapse into one. The representative geometry is the medoid, the candidate closest to all the others, so one noisy GPS trace doesn't define the segment
-7. [ ] **Direction**: count efforts per direction. A segment takes its dominant direction; the reverse becomes its own candidate if it independently qualifies
-8. [ ] **Strength** = number of distinct runs with a full effort on it (via the matcher below), tie-broken by length. Exclude stretches whose start is within ~300 m of the most common run start, so "the first block outside the front door" doesn't win every time
-9. [ ] **Top 5**, chosen greedily by strength, skipping any candidate that overlaps an already-picked segment by > 30 %
+1. [x] **Resample** every GPS run to one point per 10 m along its path (local metric projection), so recording rate doesn't bias anything
+2. [x] **Overlay on a grid** of ~20 m cells. Each run marks the cells it passes through **plus their immediate neighbours**, which absorbs GPS noise so the same path on different days lands in the same cells. Counts are *distinct runs* per cell, so laps don't inflate a cell
+3. [x] **Hot cells** = cells touched by ≥ `MIN_RUNS` runs (start at 5)
+4. [x] **Candidate stretches**: walk each run's resampled path and cut out the maximal stretches that stay in hot cells (bridging gaps < 50 m), keeping those ≥ `MIN_LENGTH` (start at 800 m)
+5. [x] **Split at junctions**: along each candidate, cut where the set of runs passing changes (Jaccard similarity of run sets drops below ~0.7; a branch joins or peels off). Each piece then has roughly uniform traffic and ends at a natural decision point
+6. [x] **Merge duplicates**: candidates from different runs describing the same stretch (ends within 50 m, ≥ 90 % shape overlap) collapse into one. The representative geometry is the medoid, the candidate closest to all the others, so one noisy GPS trace doesn't define the segment
+7. [x] **Direction**: count efforts per direction. A segment takes its dominant direction; the reverse becomes its own candidate if it independently qualifies
+8. [x] **Strength** = number of distinct runs with a full effort on it (via the matcher below), tie-broken by length. Exclude stretches whose start is within ~300 m of the most common run start, so "the first block outside the front door" doesn't win every time
+9. [x] **Top 5**, chosen greedily by strength, skipping any candidate that overlaps an already-picked segment by > 30 %
 
 *Effort matching (`lib/segments/match.ts`)*
-- [ ] Bounding-box prefilter (segment bbox + 50 m) → every pass within 30 m of the segment start → first point after it within 30 m of the end, with path length within ±15 % of the segment → both-way shape check: ≥ 90 % of points within 40 m. One run can yield multiple efforts
-- [ ] Start/end crossing times interpolated between GPS samples, not snapped to the nearest sample
-- [ ] Per effort: elapsed time, avg pace, avg HR, EF, grade-adjusted pace, plus that run's weather
+- [x] Bounding-box prefilter (segment bbox + 50 m) → every pass within 30 m of the segment start → first point after it within 30 m of the end, with path length within ±15 % of the segment → both-way shape check: ≥ 90 % of points within 40 m. One run can yield multiple efforts
+- [x] Start/end crossing times interpolated between GPS samples, not snapped to the nearest sample
+- [ ] Per effort: elapsed time, avg pace, avg HR, EF, grade-adjusted pace, plus that run's weather (*built: time, pace, avg HR, feels-like temp; EF and grade-adjusted pace deferred*)
 
 *Storage & refresh*
-- [ ] New `Segment` (geometry resampled at 10 m, length, elevation profile, direction, strength, `name`, `pinned`) and `SegmentEffort` (segment, activity, start/end sample index, interpolated start/end time, metrics) tables
-- [ ] Discovery runs from an admin action ("Rediscover segments" in Settings) and after a sync adds runs, never on page load. New runs get efforts matched against existing segments on sync
-- [ ] Re-discovery is stable: a new top-5 candidate overlapping an existing segment by ≥ 70 % updates it in place, keeping your rename. Pinned segments are never dropped
-- [ ] Segments get auto-names from position ("Segment 1 · 1.4 km"), renameable
+- [x] New `Segment` (geometry resampled at 10 m, length, elevation profile, direction, strength, `name`, `pinned`) and `SegmentEffort` (segment, activity, start/end sample index, interpolated start/end time, metrics) tables
+- [x] Discovery runs from an admin action ("Rediscover segments" in Settings) and after a sync adds runs, never on page load. New runs get efforts matched against existing segments on sync
+- [x] Re-discovery is stable: a new top-5 candidate overlapping an existing segment by ≥ 70 % updates it in place, keeping your rename. Pinned segments are never dropped
+- [x] Segments get auto-names from position ("Segment 1 · 1.4 km"), renameable
 
 *Views*
-- [ ] **`/segments`** page (in nav near Heatmap): map with the 5 segments highlighted, each card showing length, elevation gain, effort count, best/latest time
-- [ ] **Segment detail** (`/segments/[id]`):
+- [x] **`/segments`** page (in nav near Heatmap): map with the 5 segments highlighted, each card showing length, elevation gain, effort count, best/latest time
+- [x] **Segment detail** (`/segments/[id]`):
   - efforts table and trend chart (pace, avg HR, EF over date), so faster-at-the-same-effort is visible
   - **speed vs. elevation overlay**: pick up to 5 efforts; x = distance along the segment (each effort projected onto the segment geometry so hills line up), y = speed (unit-aware), elevation profile shaded behind
-- [ ] Heatmap: segments drawn as a highlighted layer; clicking one opens a popup linking to its detail page
-- [ ] Run detail page lists the segment efforts in that run, with rank among all efforts
-- [ ] All queries respect the demo date window
+- [x] Heatmap: segments drawn as a highlighted layer; clicking one opens a popup linking to its detail page
+- [x] Run detail page lists the segment efforts in that run, with rank among all efforts
+- [x] All queries respect the demo date window
 
 *Validation before UI*
-- [ ] Run discovery on real data and render the top ~10 candidates on a static map for review; tune `MIN_RUNS`, `MIN_LENGTH`, cell size and split threshold before building the pages
+- [x] Run discovery on real data and render the top ~10 candidates on a static map for review; tune `MIN_RUNS`, `MIN_LENGTH`, cell size and split threshold before building the pages
 
 *Implementation notes (as built, 2026-10-09). These differ from the plan above:*
 - Effort endpoint radius is 50 m, not 30 m. On real data a run cutting a corner passed the start at 41 m
@@ -478,15 +478,19 @@ Routes are rarely repeated whole (runs get spliced together from familiar pieces
 - *Effort-normalized comparison*: grade-adjusted pace + HR + weather overlay so a hot-day slowdown isn't read as lost fitness
 
 **Cadence & stride length over time**
-- [ ] Verify cadence units first: Intervals.icu / FIT cadence for running can arrive as **one-foot rpm** (~85) rather than steps per minute (~170). Check against a known run and normalize to steps/min in one helper (`normalizeCadence()`), applied at read time so stored data isn't rewritten
-- [ ] Stride length derived per run as `speed ÷ (cadence / 60)` over samples where the runner is moving (velocity above a walking threshold), reported as average step length in m (ft-in when unit is mi — same convention Garmin uses for "stride length")
-- [ ] Per-run averages computed server-side; new **Running Form** chart on `/analysis`: cadence (spm) and stride length on dual axes, one dot per run with a rolling 4-week average line
-- [ ] Option to filter to easy runs only (via effort classification), since cadence and stride naturally rise with pace and mixing them hides the trend
-- [ ] Runs without a cadence stream are skipped; empty state if fewer than a handful qualify
-- [ ] Run detail deep dive gains a cadence line on the existing charts if the stream exists
-- [ ] Add a Running Form section to `/how-to-use` (what cadence and stride length are, what a healthy trend looks like)
+- [x] Verify cadence units first: Intervals.icu / FIT cadence for running can arrive as **one-foot rpm** (~85) rather than steps per minute (~170). Check against a known run and normalize to steps/min in one helper (`normalizeCadence()`), applied at read time so stored data isn't rewritten
+- [x] Stride length derived per run as `speed ÷ (cadence / 60)` over samples where the runner is moving (velocity above a walking threshold), reported as average step length in m (ft-in when unit is mi — same convention Garmin uses for "stride length")
+- [x] Per-run averages computed server-side; new **Running Form** chart on `/analysis`: cadence (spm) and stride length on dual axes, one dot per run with a rolling 4-week average line
+- [x] Option to filter to easy runs only (via effort classification), since cadence and stride naturally rise with pace and mixing them hides the trend
+- [x] Runs without a cadence stream are skipped; empty state if fewer than a handful qualify
+- [x] Run detail deep dive gains a cadence line on the existing charts if the stream exists
+- [x] Add a Running Form section to `/how-to-use` (what cadence and stride length are, what a healthy trend looks like)
 
-- [ ] **Test**: log in, record/upload a new run in Intervals.icu, click Sync on `/runs` without reloading → new run appears in the list; login sync + immediate manual sync no longer returns a 502; Effort chart shows hours per week in absolute mode and percentages summing to 100 % in % view, and a run with an HR stream that's half easy / half hard splits accordingly instead of counting as one zone; discovery returns 5 non-overlapping segments that each show ≥ 5 distinct runs and look right on the map; the front-door stretch is not among them; a run passing through a segment twice yields two efforts; a run that hits the start and end but takes a different street between does not match; renaming a segment survives re-discovery; the speed-vs-elevation overlay lines hills up across efforts; clicking a segment on the heatmap links to its page; cadence values land in the ~150–190 spm range after normalization; stride length is plausible (~0.8–1.4 m); demo session sees only in-window runs in segment efforts and form charts; all new views render at 390 px with no horizontal overflow
+- [ ] **Test**: log in, record/upload a new run in Intervals.icu, click Sync on `/runs` without reloading → new run appears in the list; login sync + immediate manual sync no longer returns a 502; Effort chart shows hours per week in absolute mode and percentages summing to 100 % in % view, and a run with an HR stream that's half easy / half hard splits accordingly instead of counting as one zone; discovery returns 5 non-overlapping segments that each show ≥ 5 distinct runs and look right on the map; the front-door stretch is not among them; a run passing through a segment twice yields two efforts; a run that hits the start and end but takes a different street between does not match; renaming a segment survives re-discovery; the speed-vs-elevation overlay lines hills up across efforts; clicking a segment on the heatmap links to its page; cadence values land in a plausible running range after normalization (~140–150 spm on this data); stride length is plausible (~0.8–1.4 m); demo session sees only in-window runs in segment efforts and form charts; all new views render at 390 px with no horizontal overflow
+
+**Post-wave additions (2026-10-10)**
+- Heart-rate zones are now MAF-anchored and driven by a **birthday** (`UserSettings.birthDate`, Settings → Training) instead of a fixed age or the highest recorded HR: easy ≤ MAF (180 − age), Zone 2 = MAF − 10 … MAF, hard ≥ 87 % of 220 − age, max HR = max(220 − age, highest recorded). Each run uses the age on its own date (`zonesOn(profile, date)` in `lib/analysis.ts`), so aging never rewrites past runs. The legacy `age` column is a fallback when no birthday is set; with neither, zones fall back to shares of the highest recorded HR
+- Zone time is computed on the fly (Analysis: server, full-resolution streams; run page: browser, ≤ 1,500-point streams, within 1 percentage point of full resolution). Nothing is cached. Revisit storing per-run totals if the Analysis page slows down with a few hundred more runs
 
 ---
 
