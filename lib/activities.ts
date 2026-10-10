@@ -61,3 +61,15 @@ export async function findActivityById<
     where,
   }) as Promise<Prisma.ActivityGetPayload<T> | null>
 }
+
+/**
+ * Where-clause for SegmentEffort reads. Efforts carry a copy of their run's
+ * date, so the demo window applies the same way it does to activities.
+ */
+export async function effortWhere(
+  session: Session | null,
+  where: Prisma.SegmentEffortWhereInput = {},
+): Promise<Prisma.SegmentEffortWhereInput> {
+  if (!session?.isDemo) return where
+  return { ...where, date: await demoDateWindow() }
+}
