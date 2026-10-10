@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { parseGpx } from '@/lib/parsers/gpx'
 import { parseFit } from '@/lib/parsers/fit'
 import { backfillWeather } from '@/lib/weather'
+import { matchNewRuns } from '@/lib/segments/store'
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
   }
 
   const results: { name: string; success: boolean; error?: string }[] = []
+  const createdIds: string[] = []
 
   for (const file of files) {
     try {
@@ -36,7 +38,7 @@ export async function POST(request: Request) {
         continue
       }
 
-      await prisma.activity.create({
+      const created = await prisma.activity.create({
         data: {
           name: parsed.name,
           date: parsed.date,
@@ -58,6 +60,8 @@ export async function POST(request: Request) {
                     altitude: parsed.streams.altitude ?? undefined,
                     cadence: parsed.streams.cadence ?? undefined,
                     distance: parsed.streams.distance ?? undefined,
+                    latitude: parsed.streams.latitude ?? undefined,
+                    longitude: parsed.streams.longitude ?? undefined,
                   },
                 },
               }
@@ -65,6 +69,7 @@ export async function POST(request: Request) {
         },
       })
 
+      createdIds.push(created.id)
       results.push({ name: file.name, success: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Parse error'
@@ -74,6 +79,7 @@ export async function POST(request: Request) {
 
   // Fire-and-forget weather fetch for the newly uploaded runs.
   if (results.some(r => r.success)) void backfillWeather()
+  void matchNewRuns(createdIds).catch(err => console.error('Segment matching failed:', err))
 
   const allOk = results.every(r => r.success)
   return Response.json({ results }, { status: allOk ? 200 : 207 })

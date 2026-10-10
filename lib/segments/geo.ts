@@ -63,3 +63,23 @@ export function pathLength(points: XY[]) {
   for (let i = 1; i < points.length; i++) total += dist(points[i - 1], points[i])
   return total
 }
+
+/** Share of `a`'s points lying within `corridor` meters of polyline `b`. */
+export function overlapShare(a: XY[], b: XY[], corridor: number) {
+  if (a.length === 0 || b.length === 0) return 0
+  let hit = 0
+  for (const p of a) {
+    let best = Infinity
+    for (let i = 1; i < b.length && best > corridor; i++) {
+      const s = b[i - 1]
+      const e = b[i]
+      const dx = e.x - s.x
+      const dy = e.y - s.y
+      const len2 = dx * dx + dy * dy
+      const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - s.x) * dx + (p.y - s.y) * dy) / len2))
+      best = Math.min(best, Math.hypot(p.x - (s.x + t * dx), p.y - (s.y + t * dy)))
+    }
+    if (best <= corridor) hit++
+  }
+  return hit / a.length
+}

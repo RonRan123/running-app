@@ -3,6 +3,7 @@ import { fetchActivities, fetchGpsStream, fetchStreams } from '@/lib/intervals'
 import type { ActivityStreams } from '@/lib/intervals'
 import { Prisma } from '@prisma/client'
 import { backfillWeather } from '@/lib/weather'
+import { matchNewRuns } from '@/lib/segments/store'
 
 const RUN_TYPES = new Set(['Run', 'VirtualRun', 'TrailRun', 'Treadmill'])
 
@@ -53,6 +54,8 @@ function streamData(activityId: string, s: ActivityStreams) {
     altitude: (s.altitude ?? undefined) as Prisma.InputJsonValue | undefined,
     cadence: (s.cadence ?? undefined) as Prisma.InputJsonValue | undefined,
     distance: (s.distance ?? undefined) as Prisma.InputJsonValue | undefined,
+    latitude: (s.latitude ?? undefined) as Prisma.InputJsonValue | undefined,
+    longitude: (s.longitude ?? undefined) as Prisma.InputJsonValue | undefined,
   }
 }
 
@@ -86,13 +89,14 @@ export async function runSync(oldest: Date): Promise<SyncResult> {
   let skipped = 0
   let gpsAdded = 0
   let streamsAdded = 0
+  const createdIds: string[] = []
 
   for (const a of runs) {
     const externalId = `intervals:${a.id}`
 
     const existing = await prisma.activity.findUnique({
       where: { externalId },
-      include: { stream: { select: { id: true } } },
+      include: { stream: { select: { id: true, latitude: true } } },
     })
     if (existing) {
       // Backfill GPS for activities synced before we fetched coordinates
@@ -111,6 +115,20 @@ export async function runSync(oldest: Date): Promise<SyncResult> {
       if (!existing.stream) {
         const streams = await getStreams(a.id)
         if (streams && (await saveStreams(existing.id, streams))) streamsAdded++
+        await sleep(FETCH_DELAY_MS)
+      } else if (existing.stream.latitude === null && existing.coordinates !== null) {
+        // Backfill time-aligned GPS for streams stored before we fetched latlng
+        const streams = await getStreams(a.id)
+        if (streams?.latitude && streams.longitude && streams.time.length === streams.latitude.length) {
+          await prisma.activityStream.update({
+            where: { id: existing.stream.id },
+            data: {
+              latitude: streams.latitude as unknown as Prisma.InputJsonValue,
+              longitude: streams.longitude as unknown as Prisma.InputJsonValue,
+            },
+          })
+          gpsAdded++
+        }
         await sleep(FETCH_DELAY_MS)
       }
       skipped++
@@ -157,6 +175,7 @@ export async function runSync(oldest: Date): Promise<SyncResult> {
       throw err
     }
     synced++
+    createdIds.push(created.id)
 
     const streams = await getStreams(a.id)
     if (streams && (await saveStreams(created.id, streams))) streamsAdded++
@@ -166,6 +185,8 @@ export async function runSync(oldest: Date): Promise<SyncResult> {
   // Fire-and-forget: pull Open-Meteo weather for any run that hasn't been
   // attempted yet (newly synced ones included). Never blocks the sync result.
   void backfillWeather()
+  // Same for segment efforts on the new runs.
+  void matchNewRuns(createdIds).catch(err => console.error('Segment matching failed:', err))
 
   return { synced, skipped, gpsAdded, streamsAdded, total: runs.length }
 }
