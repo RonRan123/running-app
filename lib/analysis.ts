@@ -32,33 +32,81 @@ const REST_HR = 60
 // Fallback when no activity has a recorded max HR.
 const DEFAULT_MAX_HR = 190
 
-// Effort bands as a fraction of max HR. "Easy" tops out at ~78% HRmax
-// (the upper edge of Zone 2 in a five-zone model), "hard" starts at ~87%
-// (threshold and above).
-export const EASY_CEILING = 0.78
-export const MODERATE_CEILING = 0.87
-// Zone 2 band used for the aerobic pace trend.
-const ZONE2_FLOOR = 0.65
-
 export type Effort = 'easy' | 'moderate' | 'hard'
 
-export function estimateMaxHr(activities: AnalysisActivity[]) {
-  const observed = activities
-    .map(a => a.maxHeartRate ?? 0)
-    .reduce((max, hr) => Math.max(max, hr), 0)
-  return observed > 120 ? observed : DEFAULT_MAX_HR
+/**
+ * Heart-rate zones used everywhere in the app (bpm, inclusive bounds).
+ *
+ * With an age set (Settings → Training) the zones are MAF-anchored:
+ *   easy     ≤ MAF (180 − age)
+ *   Zone 2   MAF − 10 … MAF
+ *   hard     ≥ 87 % of age-predicted max (220 − age)
+ *   moderate in between
+ * and max HR (for training load and "% of max") is 220 − age, or the highest
+ * recorded max if that is higher.
+ *
+ * Without an age they fall back to fixed shares of the highest recorded max
+ * HR: easy ≤ 78 %, Zone 2 65–78 %, hard > 87 %.
+ */
+export interface HrZones {
+  basis: 'age' | 'recorded'
+  maf: number | null
+  maxHr: number
+  zone2Min: number
+  easyMax: number
+  hardMin: number
 }
 
-export function classifyEffort(avgHr: number, maxHr: number): Effort {
-  const frac = avgHr / maxHr
-  if (frac <= EASY_CEILING) return 'easy'
-  if (frac <= MODERATE_CEILING) return 'moderate'
+/** Maffetone target HR: 180 − age. */
+export function mafTarget(age: number) {
+  return 180 - age
+}
+
+const HARD_SHARE = 0.87
+const EASY_SHARE = 0.78
+const ZONE2_SHARE = 0.65
+
+function recordedMaxHr(activities: Pick<AnalysisActivity, 'maxHeartRate'>[]) {
+  return activities.reduce((max, a) => Math.max(max, a.maxHeartRate ?? 0), 0)
+}
+
+export function hrZones(
+  age: number | null | undefined,
+  activities: Pick<AnalysisActivity, 'maxHeartRate'>[],
+): HrZones {
+  const recorded = recordedMaxHr(activities)
+  if (age != null && age > 0) {
+    const maf = mafTarget(age)
+    const predicted = 220 - age
+    const hardMin = Math.max(maf + 2, Math.round(predicted * HARD_SHARE))
+    return {
+      basis: 'age',
+      maf,
+      maxHr: Math.max(predicted, recorded),
+      zone2Min: maf - 10,
+      easyMax: maf,
+      hardMin,
+    }
+  }
+  const maxHr = recorded > 120 ? recorded : DEFAULT_MAX_HR
+  return {
+    basis: 'recorded',
+    maf: null,
+    maxHr,
+    zone2Min: Math.ceil(maxHr * ZONE2_SHARE),
+    easyMax: Math.floor(maxHr * EASY_SHARE),
+    hardMin: Math.floor(maxHr * HARD_SHARE) + 1,
+  }
+}
+
+export function classifyEffort(hr: number, zones: HrZones): Effort {
+  if (hr <= zones.easyMax) return 'easy'
+  if (hr < zones.hardMin) return 'moderate'
   return 'hard'
 }
 
-export function isZone2(avgHr: number, maxHr: number) {
-  const frac = avgHr / maxHr
-  return frac >= ZONE2_FLOOR && frac <= EASY_CEILING
+export function isZone2(hr: number, zones: HrZones) {
+  return hr >= zones.zone2Min && hr <= zones.easyMax
 }
 
 /**
@@ -155,7 +203,7 @@ export interface WeeklyZones {
  */
 export function weeklyTimeInZones(
   activities: AnalysisActivity[],
-  maxHr: number,
+  zones: HrZones,
 ): WeeklyZones[] {
   const weeks = new Map<string, Record<Effort, number> & { fallbackRuns: number }>()
   for (const a of activities) {
@@ -167,7 +215,7 @@ export function weeklyTimeInZones(
       week.moderate += a.zoneSeconds.moderate
       week.hard += a.zoneSeconds.hard
     } else {
-      week[classifyEffort(a.avgHeartRate!, maxHr)] += a.duration
+      week[classifyEffort(a.avgHeartRate!, zones)] += a.duration
       week.fallbackRuns++
     }
     weeks.set(key, week)

@@ -2,7 +2,7 @@
 
 import ChartCard from '@/components/analysis/ChartCard'
 import { formatDuration } from '@/lib/units'
-import { EASY_CEILING, MODERATE_CEILING, type Effort } from '@/lib/analysis'
+import type { Effort, HrZones } from '@/lib/analysis'
 
 const ZONE_META: { key: Effort; label: string; color: string }[] = [
   { key: 'easy', label: 'Easy', color: '#22c55e' },
@@ -10,27 +10,23 @@ const ZONE_META: { key: Effort; label: string; color: string }[] = [
   { key: 'hard', label: 'Hard', color: '#ef4444' },
 ]
 
-function zoneDefinition(key: Effort, maxHr: number) {
-  const easyTop = Math.round(maxHr * EASY_CEILING)
-  const moderateTop = Math.round(maxHr * MODERATE_CEILING)
-  const easyPct = Math.round(EASY_CEILING * 100)
-  const moderatePct = Math.round(MODERATE_CEILING * 100)
+function zoneDefinition(key: Effort, z: HrZones) {
   switch (key) {
     case 'easy':
-      return `≤ ${easyTop} bpm (up to ${easyPct}% of max HR) — conversational aerobic running`
+      return `≤ ${z.easyMax} bpm${z.maf !== null ? ' (at or below your MAF target)' : ''} — conversational aerobic running`
     case 'moderate':
-      return `${easyTop + 1}–${moderateTop} bpm (${easyPct}–${moderatePct}% of max HR) — steady to tempo effort`
+      return `${z.easyMax + 1}–${z.hardMin - 1} bpm — steady to tempo effort`
     case 'hard':
-      return `> ${moderateTop} bpm (over ${moderatePct}% of max HR) — threshold and above`
+      return `≥ ${z.hardMin} bpm — threshold and above`
   }
 }
 
 export default function ZoneBar({
   zones,
-  maxHr,
+  hrZones,
 }: {
   zones: Record<Effort, number>
-  maxHr: number
+  hrZones: HrZones
 }) {
   const total = zones.easy + zones.moderate + zones.hard
   if (total === 0) return null
@@ -38,7 +34,7 @@ export default function ZoneBar({
   return (
     <ChartCard
       title="Time in Zones"
-      subtitle={`How this run's heart rate time splits across effort bands, based on your estimated max HR of ${maxHr} bpm — easy runs should be overwhelmingly green.`}
+      subtitle={`How this run's heart rate time splits across effort bands, ${hrZones.basis === 'age' ? 'set from your age' : 'based on your highest recorded HR (set your age in Settings to use MAF zones)'} — easy runs should be overwhelmingly green.`}
     >
       <div className="flex h-6 rounded-full overflow-hidden">
         {ZONE_META.filter(z => zones[z.key] > 0).map(z => (
@@ -60,7 +56,7 @@ export default function ZoneBar({
                 {z.label} · {formatDuration(Math.round(zones[z.key]))} (
                 {Math.round((zones[z.key] / total) * 100)}%)
               </span>
-              <span className="text-zinc-400"> — {zoneDefinition(z.key, maxHr)}</span>
+              <span className="text-zinc-400"> — {zoneDefinition(z.key, hrZones)}</span>
             </div>
           </div>
         ))}

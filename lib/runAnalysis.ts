@@ -1,4 +1,4 @@
-import { classifyEffort, type Effort } from '@/lib/analysis'
+import { classifyEffort, type Effort, type HrZones } from '@/lib/analysis'
 
 // Per-sample streams for one run, all arrays aligned with `time`.
 export interface RunStreams {
@@ -10,10 +10,6 @@ export interface RunStreams {
   distance: number[] | null // cumulative meters
 }
 
-/** Maffetone target HR: 180 − age. The aerobic band shown is (maf − 10)..maf. */
-export function mafTarget(age: number) {
-  return 180 - age
-}
 
 /** Time-weighted % of the run spent at or below the MAF target. */
 export function pctAtOrBelowMaf(time: number[], heartrate: number[], maf: number) {
@@ -29,12 +25,12 @@ export function pctAtOrBelowMaf(time: number[], heartrate: number[], maf: number
 }
 
 /** Seconds spent in each effort band, classified sample-by-sample. */
-export function timeInZones(time: number[], heartrate: number[], maxHr: number) {
+export function timeInZones(time: number[], heartrate: number[], hrZones: HrZones) {
   const zones: Record<Effort, number> = { easy: 0, moderate: 0, hard: 0 }
   for (let i = 1; i < time.length; i++) {
     const dt = time[i] - time[i - 1]
     if (dt <= 0 || heartrate[i] <= 0) continue
-    zones[classifyEffort(heartrate[i], maxHr)] += dt
+    zones[classifyEffort(heartrate[i], hrZones)] += dt
   }
   return zones
 }

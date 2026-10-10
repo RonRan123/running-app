@@ -12,7 +12,7 @@ import {
   YAxis,
 } from 'recharts'
 import { format } from 'date-fns'
-import { classifyEffort, type AnalysisActivity } from '@/lib/analysis'
+import { classifyEffort, type AnalysisActivity, type HrZones } from '@/lib/analysis'
 import type { Unit } from '@/lib/units'
 import ChartCard, { ChartEmpty } from './ChartCard'
 
@@ -107,11 +107,11 @@ function FormChart({
 
 export default function RunningForm({
   activities,
-  maxHr,
+  zones,
   unit,
 }: {
   activities: AnalysisActivity[]
-  maxHr: number
+  zones: HrZones
   unit: Unit
 }) {
   const [easyOnly, setEasyOnly] = useState(true)
@@ -119,7 +119,7 @@ export default function RunningForm({
   const points = useMemo(() => {
     const raw = activities
       .filter(a => a.cadenceSpm && a.stepLengthM)
-      .filter(a => !easyOnly || (a.avgHeartRate && classifyEffort(a.avgHeartRate, maxHr) === 'easy'))
+      .filter(a => !easyOnly || (a.avgHeartRate && classifyEffort(a.avgHeartRate, zones) === 'easy'))
       .map(a => ({
         ts: new Date(a.date).getTime(),
         name: a.name,
@@ -128,7 +128,7 @@ export default function RunningForm({
       }))
       .sort((a, b) => a.ts - b.ts)
     return withRollingAverages(raw)
-  }, [activities, easyOnly, maxHr, unit])
+  }, [activities, easyOnly, zones, unit])
 
   const stepUnit = unit === 'mi' ? 'ft' : 'm'
 

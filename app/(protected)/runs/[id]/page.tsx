@@ -12,7 +12,7 @@ import WeatherBadge from '@/components/WeatherBadge'
 import RunDeepDive from '@/components/deepdive/RunDeepDive'
 import RunSegmentEfforts, { type RunEffort } from '@/components/segments/RunSegmentEfforts'
 import { bestEfforts, type EffortActivity } from '@/lib/records'
-import { estimateMaxHr, trimp } from '@/lib/analysis'
+import { hrZones, trimp } from '@/lib/analysis'
 import { computeSplits, downsampleStreams, type RunStreams } from '@/lib/runAnalysis'
 import { KM_PER_MILE } from '@/lib/units'
 
@@ -128,9 +128,9 @@ export default async function RunDetailPage({
   }
 
   const analysisActivities = allActivities.map(a => ({ ...a, date: a.date.toISOString() }))
-  const maxHr = estimateMaxHr(analysisActivities)
+  const zones = hrZones(settings?.age, analysisActivities)
   const activityForTrimp = { ...activity, date: activity.date.toISOString(), avgPace: activity.avgPace, avgHeartRate: activity.avgHeartRate, maxHeartRate: activity.maxHeartRate, name: activity.name }
-  const runTrimp = activity.avgHeartRate ? trimp(activityForTrimp, maxHr) : null
+  const runTrimp = activity.avgHeartRate ? trimp(activityForTrimp, zones.maxHr) : null
 
   const splitsMi = streams ? computeSplits(streams, KM_PER_MILE * 1000) : []
   const splitsKm = streams ? computeSplits(streams, 1000) : []
@@ -215,8 +215,7 @@ export default async function RunDetailPage({
         splitsMi={splitsMi}
         splitsKm={splitsKm}
         trimp={runTrimp}
-        maxHr={maxHr}
-        initialAge={settings?.age ?? null}
+        zones={zones}
       />
     </div>
   )

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { mafTarget } from '@/lib/runAnalysis'
+import { mafTarget } from '@/lib/analysis'
 
 export default function AgeSetting() {
   const [age, setAge] = useState<number | null>(null)
@@ -53,10 +53,15 @@ export default function AgeSetting() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-zinc-500">
-        Your age sets the Maffetone (MAF) aerobic target — 180 − age — drawn as a band on every
-        run&apos;s heart rate chart.
+        Your age sets every heart-rate zone in the app. Easy is at or below your Maffetone (MAF)
+        target of 180 − age (also drawn as a band on each run&apos;s heart rate chart), Zone 2 is
+        the 10 beats below it, and hard starts at 87% of your age-predicted max (220 − age).
         {age != null && (
-          <span className="text-zinc-900 font-medium"> Current target: {mafTarget(age)} bpm.</span>
+          <span className="text-zinc-900 font-medium">
+            {' '}
+            Current: easy ≤ {mafTarget(age)} bpm, Zone 2 {mafTarget(age) - 10}–{mafTarget(age)} bpm,
+            hard ≥ {Math.max(mafTarget(age) + 2, Math.round((220 - age) * 0.87))} bpm.
+          </span>
         )}
       </p>
       <div className="flex items-center gap-3">

@@ -91,9 +91,13 @@ export default function HowToUsePage() {
 
       <Section title="The Analysis page, chart by chart">
         <p className="text-zinc-500">
-          A few terms used throughout: <strong>max HR</strong> is your highest observed heart
-          rate. <strong>Zone 2</strong> means roughly 65–78% of max HR — a genuinely easy,
-          conversational effort. Runs are classified by their average heart rate.
+          A few terms used throughout. Every heart-rate zone comes from the age you set in
+          Settings: <strong>easy</strong> means at or below your <strong>MAF</strong> target
+          (180 − age), <strong>Zone 2</strong> is the 10 beats just below MAF — a genuinely easy,
+          conversational effort — and <strong>hard</strong> starts at 87% of your age-predicted
+          max (220 − age). <strong>Max HR</strong> is 220 − age, or the highest you&apos;ve
+          actually recorded if that&apos;s higher. Without an age, the app falls back to shares of
+          your highest recorded heart rate.
         </p>
 
         <div className="space-y-5 mt-4">

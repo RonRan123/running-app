@@ -7,12 +7,12 @@ import UnitToggle from '@/components/UnitToggle'
 import { useUnit } from '@/lib/useUnit'
 import {
   acuteChronicRatio,
-  estimateMaxHr,
   fitnessFatigue,
   longRunByWeek,
   weeklyVolume,
   weeklyTimeInZones,
   type AnalysisActivity,
+  type HrZones,
 } from '@/lib/analysis'
 import AerobicScatter from './AerobicScatter'
 import EfficiencyTrend from './EfficiencyTrend'
@@ -25,7 +25,13 @@ import LongRunProgression from './LongRunProgression'
 import WeatherPerformance from './WeatherPerformance'
 import Zone2PaceTrend from './Zone2PaceTrend'
 
-export default function AnalysisView({ activities }: { activities: AnalysisActivity[] }) {
+export default function AnalysisView({
+  activities,
+  zones,
+}: {
+  activities: AnalysisActivity[]
+  zones: HrZones
+}) {
   const { unit, changeUnit } = useUnit()
 
   const today = useMemo(() => startOfDay(new Date()), [])
@@ -52,10 +58,9 @@ export default function AnalysisView({ activities }: { activities: AnalysisActiv
     })
   }, [activities, range])
 
-  const maxHr = useMemo(() => estimateMaxHr(activities), [activities])
-  const weeklyZones = useMemo(() => weeklyTimeInZones(inRange, maxHr), [inRange, maxHr])
+  const weeklyZones = useMemo(() => weeklyTimeInZones(inRange, zones), [inRange, zones])
   const weeklyVol = useMemo(() => weeklyVolume(inRange, range.from, range.to), [inRange, range])
-  const load = useMemo(() => fitnessFatigue(activities, maxHr), [activities, maxHr])
+  const load = useMemo(() => fitnessFatigue(activities, zones.maxHr), [activities, zones])
   const loadRatio = useMemo(() => acuteChronicRatio(load), [load])
   const longRuns = useMemo(() => longRunByWeek(activities), [activities])
 
@@ -65,8 +70,9 @@ export default function AnalysisView({ activities }: { activities: AnalysisActiv
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">Analysis</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
-            {inRange.length} {inRange.length === 1 ? 'run' : 'runs'} in the selected range · max HR
-            estimated at {maxHr} bpm
+            {inRange.length} {inRange.length === 1 ? 'run' : 'runs'} in the selected range · easy ≤{' '}
+            {zones.easyMax}, hard ≥ {zones.hardMin} bpm
+            {zones.basis === 'age' ? ' (from your age)' : ' (from your highest recorded HR — set your age in Settings)'}
           </p>
         </div>
         <UnitToggle unit={unit} onChange={changeUnit} />
@@ -86,10 +92,10 @@ export default function AnalysisView({ activities }: { activities: AnalysisActiv
       <AerobicScatter activities={inRange} unit={unit} />
       <div className="grid gap-6 lg:grid-cols-2">
         <EfficiencyTrend activities={inRange} />
-        <Zone2PaceTrend activities={inRange} maxHr={maxHr} unit={unit} />
+        <Zone2PaceTrend activities={inRange} zones={zones} unit={unit} />
       </div>
       <ZoneDistribution weekly={weeklyZones} />
-      <RunningForm activities={inRange} maxHr={maxHr} unit={unit} />
+      <RunningForm activities={inRange} zones={zones} unit={unit} />
       <WeatherPerformance activities={inRange} unit={unit} />
 
       {/* Training load — fixed windows, independent of the slider */}

@@ -2,7 +2,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { findActivities } from '@/lib/activities'
 import AnalysisView from '@/components/analysis/AnalysisView'
-import { estimateMaxHr } from '@/lib/analysis'
+import { hrZones } from '@/lib/analysis'
+import { prisma } from '@/lib/prisma'
 import { runningForm, timeInZones } from '@/lib/runAnalysis'
 
 export const metadata = {
@@ -11,6 +12,7 @@ export const metadata = {
 
 export default async function AnalysisPage() {
   const session = await getServerSession(authOptions)
+  const settings = await prisma.userSettings.findUnique({ where: { id: 1 } })
   const activities = await findActivities(session, {
     orderBy: { date: 'asc' },
     select: {
@@ -30,17 +32,18 @@ export default async function AnalysisPage() {
   })
 
   // Time-in-zone and running form are computed from streams here so raw
-  // streams never ship to the client. Same max-HR estimate AnalysisView derives client-side.
-  const maxHr = estimateMaxHr(activities.map(a => ({ ...a, date: a.date.toISOString() })))
+  // streams never ship to the client. Zones come from the age in Settings → Training.
+  const zones = hrZones(settings?.age, activities)
 
   return (
     <AnalysisView
+      zones={zones}
       activities={activities.map(({ stream, ...a }) => {
         const time = stream?.time as number[] | undefined
         const hr = stream?.heartrate as number[] | null | undefined
-        const zones = time && hr && hr.length === time.length ? timeInZones(time, hr, maxHr) : null
+        const secs = time && hr && hr.length === time.length ? timeInZones(time, hr, zones) : null
         // An HR stream with no usable samples falls back to avg-HR classification.
-        const hasTime = zones && zones.easy + zones.moderate + zones.hard > 0
+        const hasTime = secs && secs.easy + secs.moderate + secs.hard > 0
         const cadence = stream?.cadence as number[] | null | undefined
         const velocity = stream?.velocity as number[] | null | undefined
         const distance = stream?.distance as number[] | null | undefined
@@ -53,7 +56,7 @@ export default async function AnalysisPage() {
         return {
           ...a,
           date: a.date.toISOString(),
-          zoneSeconds: hasTime ? zones : null,
+          zoneSeconds: hasTime ? secs : null,
           cadenceSpm: form?.cadenceSpm ?? null,
           stepLengthM: form?.stepLengthM ?? null,
         }
