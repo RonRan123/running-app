@@ -20,6 +20,18 @@ async function demoDateWindow(): Promise<Prisma.DateTimeFilter> {
 }
 
 /**
+ * The latest moment this session may see runs from: the end of the demo
+ * window for a demo session (if it's in the past), otherwise now. Pages that
+ * show "this week" use it so the demo lands on a populated week.
+ */
+export async function visibleNow(session: Session | null): Promise<Date> {
+  const now = new Date()
+  if (!session?.isDemo) return now
+  const { lte } = await demoDateWindow()
+  return lte instanceof Date && lte < now ? lte : now
+}
+
+/**
  * Merge the demo date restriction into a where clause. Admin sessions pass
  * through untouched. The restriction lives in the WHERE itself (not a
  * post-query check), so even direct-ID lookups can't leak an out-of-window

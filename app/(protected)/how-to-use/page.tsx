@@ -61,6 +61,10 @@ export default function HowToUsePage() {
           in the run?
         </p>
         <p>
+          Beside the list (above it on a phone) is the <strong>activity sidebar</strong>, a quick
+          check on whether the habit is holding. It&apos;s explained in its own section below.
+        </p>
+        <p>
           <strong>Heatmap</strong> layers every GPS track you&apos;ve ever recorded onto one map.
           Brighter lines are routes you run often. Use the date slider to watch your territory
           grow over a season. Your segments show up as blue lines — click one to jump to it.
@@ -79,13 +83,52 @@ export default function HowToUsePage() {
           of the charts; the training-load section at the bottom always uses your full history.
         </p>
         <p>
-          <strong>Goals</strong> holds your race goals. For each one, the app predicts your finish
+          <strong>Goals</strong> holds your weekly goal and your race goals. For each one, the app predicts your finish
           time from your best recent efforts and shows whether you&apos;re on track. It also keeps
           your personal records for standard distances (1K to marathon), detected automatically
           from your runs.
         </p>
         <p>
-          <strong>Settings</strong> covers account details and login history.
+          <strong>Settings</strong> covers account details, your birthday (which sets heart-rate
+          zones), the time zone used for days and weeks, and login history.
+        </p>
+      </Section>
+
+      <Section title="The activity sidebar on Runs">
+        <Chart name="Your streak">
+          <p>
+            The number in the flame is how many Monday–Sunday weeks in a row you&apos;ve run at
+            least once, the same rule Strava uses. Rest days never break it; only a whole week
+            without a run does. A new week doesn&apos;t count until you run in it, but it
+            doesn&apos;t reset the streak either, so Monday morning still shows last week&apos;s
+            count. Next to it, the week&apos;s days: a dark circle for each day you ran (hover for
+            the run), grey for rest days so far, outlined for days still to come.
+          </p>
+        </Chart>
+        <Chart name="Weekly goal">
+          <p>
+            Set a target on the Goals page, either a number of runs or a distance per week. The
+            ring fills as the week goes on and starts again every Monday. For a marathon build,
+            a runs target keeps the habit going and a distance target keeps volume climbing.
+          </p>
+        </Chart>
+        <Chart name="Month calendar">
+          <p>
+            One dot per day of the month, orange on the days you ran, with the month&apos;s run
+            days, distance and time. Use the arrows to page back through earlier months and spot
+            the gaps.
+          </p>
+        </Chart>
+        <Chart name="Past 12 weeks">
+          <p>
+            Distance per week for the last 12 weeks, this week last. Hover a point for that
+            week&apos;s distance, time and run count. Steady or gently rising is what you want;
+            for the full picture use Weekly Volume on the Analysis page.
+          </p>
+        </Chart>
+        <p>
+          Days, weeks and months follow the time zone in Settings (Eastern Time unless you change
+          it), so a late-evening run counts on the day you ran it.
         </p>
       </Section>
 

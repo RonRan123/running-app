@@ -1,18 +1,27 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import type { UserSettings } from '@prisma/client'
+import { DEFAULT_TIME_ZONE, isValidTimeZone } from '@/lib/activitySummary'
+
+function serialize(settings: UserSettings | null) {
+  return {
+    age: settings?.age ?? null,
+    birthDate: settings?.birthDate?.toISOString().slice(0, 10) ?? null,
+    demoFromDate: settings?.demoFromDate?.toISOString() ?? null,
+    demoToDate: settings?.demoToDate?.toISOString() ?? null,
+    timeZone: settings?.timeZone ?? DEFAULT_TIME_ZONE,
+    weeklyGoalType: settings?.weeklyGoalType ?? null,
+    weeklyGoalTarget: settings?.weeklyGoalTarget ?? null,
+  }
+}
 
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const settings = await prisma.userSettings.findUnique({ where: { id: 1 } })
-  return Response.json({
-    age: settings?.age ?? null,
-    birthDate: settings?.birthDate?.toISOString().slice(0, 10) ?? null,
-    demoFromDate: settings?.demoFromDate?.toISOString() ?? null,
-    demoToDate: settings?.demoToDate?.toISOString() ?? null,
-  })
+  return Response.json(serialize(settings))
 }
 
 export async function PUT(request: Request) {
@@ -23,7 +32,15 @@ export async function PUT(request: Request) {
   }
 
   const body = await request.json().catch(() => null)
-  const update: { age?: number; birthDate?: Date; demoFromDate?: Date; demoToDate?: Date } = {}
+  const update: {
+    age?: number
+    birthDate?: Date
+    demoFromDate?: Date
+    demoToDate?: Date
+    timeZone?: string
+    weeklyGoalType?: string | null
+    weeklyGoalTarget?: number | null
+  } = {}
 
   // Birthday as yyyy-MM-dd, stored at UTC midnight so the calendar date never shifts.
   if (body?.birthDate !== undefined) {
@@ -60,6 +77,36 @@ export async function PUT(request: Request) {
     update.demoToDate = to
   }
 
+  if (body?.timeZone !== undefined) {
+    if (typeof body.timeZone !== 'string' || !isValidTimeZone(body.timeZone)) {
+      return Response.json({ error: 'Unknown time zone' }, { status: 400 })
+    }
+    update.timeZone = body.timeZone
+  }
+
+  // Weekly goal: { weeklyGoalType: 'runs' | 'distance', weeklyGoalTarget } or
+  // both null to clear it. Distance targets are km.
+  if (body?.weeklyGoalType !== undefined || body?.weeklyGoalTarget !== undefined) {
+    if (body?.weeklyGoalType === null) {
+      update.weeklyGoalType = null
+      update.weeklyGoalTarget = null
+    } else {
+      const type = body?.weeklyGoalType
+      const target = Number(body?.weeklyGoalTarget)
+      if (type !== 'runs' && type !== 'distance') {
+        return Response.json({ error: 'Goal type must be runs or distance' }, { status: 400 })
+      }
+      if (type === 'runs' && (!Number.isInteger(target) || target < 1 || target > 14)) {
+        return Response.json({ error: 'Runs per week must be a whole number from 1 to 14' }, { status: 400 })
+      }
+      if (type === 'distance' && (!Number.isFinite(target) || target <= 0 || target > 500)) {
+        return Response.json({ error: 'Enter a weekly distance above 0' }, { status: 400 })
+      }
+      update.weeklyGoalType = type
+      update.weeklyGoalTarget = target
+    }
+  }
+
   if (Object.keys(update).length === 0) {
     return Response.json({ error: 'Nothing to update' }, { status: 400 })
   }
@@ -69,10 +116,5 @@ export async function PUT(request: Request) {
     update,
     create: { id: 1, ...update },
   })
-  return Response.json({
-    age: settings.age,
-    birthDate: settings.birthDate?.toISOString().slice(0, 10) ?? null,
-    demoFromDate: settings.demoFromDate?.toISOString() ?? null,
-    demoToDate: settings.demoToDate?.toISOString() ?? null,
-  })
+  return Response.json(serialize(settings))
 }
