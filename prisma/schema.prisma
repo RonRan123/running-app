@@ -65,6 +65,15 @@ model UserSettings {
   // default window hardcoded in lib/activities.ts.
   demoFromDate DateTime?
   demoToDate   DateTime?
+
+  // IANA time zone for calendar boundaries (days, weeks, months) in the
+  // runs-page activity sidebar. Null = America/New_York.
+  timeZone String?
+
+  // Weekly goal on the activity sidebar: "runs" (target = run count) or
+  // "distance" (target = km). Both null = no goal set.
+  weeklyGoalType   String?
+  weeklyGoalTarget Float?
 }
 
 model RaceGoal {

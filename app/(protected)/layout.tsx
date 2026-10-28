@@ -12,7 +12,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     <div className="min-h-screen bg-zinc-50">
       <NavBar />
       {/* Extra bottom padding on mobile so content clears the bottom nav bar */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 md:py-8 pb-24 md:pb-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 md:py-8 pb-24 md:pb-8">
         {children}
       </main>
       <BottomNav />

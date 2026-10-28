@@ -501,37 +501,42 @@ Routes are rarely repeated whole (runs get spliced together from familiar pieces
 Mockups: Activity Sidebar Mockups canvas (Option A layout with Option B's compact cards).
 
 **Layout**
-- [ ] Right sidebar on `/runs` (~340 px) beside the runs table; below `lg` it stacks above the table (mobile: cards above the list)
-- [ ] Compact cards in Option B's style; every distance follows the mi/km toggle
-- [ ] Protected layout widens from `max-w-5xl` to `max-w-6xl` so the table keeps its columns next to the sidebar
+- [x] Right sidebar on `/runs` (~340 px) beside the runs table; below `lg` it stacks above the table (mobile: cards above the list)
+- [x] Compact cards in Option B's style; every distance follows the mi/km toggle
+- [x] Protected layout widens from `max-w-5xl` to `max-w-6xl` so the table keeps its columns next to the sidebar
 
 **Time zone (Settings → Training)**
-- [ ] New `UserSettings.timeZone` (IANA name, default `America/New_York`); a picker on the Settings page (admin only, demo read-only)
-- [ ] Every day/week/month boundary in the sidebar is computed in that time zone from `Activity.date` (a true UTC instant), so a 10 pm run never lands on the next day
+- [x] New `UserSettings.timeZone` (IANA name, default `America/New_York`); a picker on the Settings page (admin only, demo read-only)
+- [x] Every day/week/month boundary in the sidebar is computed in that time zone from `Activity.date` (a true UTC instant), so a 10 pm run never lands on the next day
 
 **Streak + this week**
-- [ ] Streak = consecutive Mon–Sun weeks with at least one run (Strava's definition). The current week counts once it has a run; until then the streak shows the run of weeks through last week instead of dropping to 0 mid-week
-- [ ] Mon–Sun strip: filled circle on run days (tooltip: run name and distance), grey for past rest days, outlined for future days
-- [ ] This week's distance, time and run count
+- [x] Streak = consecutive Mon–Sun weeks with at least one run (Strava's definition). The current week counts once it has a run; until then the streak shows the run of weeks through last week instead of dropping to 0 mid-week
+- [x] Mon–Sun strip: filled circle on run days (tooltip: run name and distance), grey for past rest days, outlined for future days
+- [x] This week's distance, time and run count
 
 **Weekly goal ring** (new data)
-- [ ] New `UserSettings.weeklyGoalType` (`runs` | `distance`) and `weeklyGoalTarget` (run count, or km for distance), set from a Weekly Goal card on `/goals`; distance is entered in the current mi/km unit
-- [ ] Ring with progress this week, e.g. "1 / 4 runs · 3 to go" or "6.2 / 15 mi"; when no goal is set the card links to `/goals` to set one
+- [x] New `UserSettings.weeklyGoalType` (`runs` | `distance`) and `weeklyGoalTarget` (run count, or km for distance), set from a Weekly Goal card on `/goals`; distance is entered in the current mi/km unit
+- [x] Ring with progress this week, e.g. "1 / 4 runs · 3 to go" or "6.2 / 15 mi"; when no goal is set the card links to `/goals` to set one
 
 **Month dot grid**
-- [ ] One dot per day of the month, filled on run days; the month's run days, distance and time
-- [ ] ‹ › arrows page back through earlier months (back to the first run; no paging past the current month)
+- [x] One dot per day of the month, filled on run days; the month's run days, distance and time
+- [x] ‹ › arrows page back through earlier months (back to the first run; no paging past the current month)
 
 **Past 12 weeks**
-- [ ] Weekly distance line/area chart over the last 12 weeks including the current one, hover shows each week's totals and run count; average per week in the header
+- [x] Weekly distance line/area chart over the last 12 weeks including the current one, hover shows each week's totals and run count; average per week in the header
 
 **Plumbing**
-- [ ] Pure helpers in `lib/activitySummary.ts` working on `yyyy-MM-dd` day keys (time-zone-free once bucketed), unit-checked with a small script on edge cases: streak across a rest week, a run at 11:30 pm ET, months starting on Sunday
-- [ ] `runs/page.tsx` buckets runs per local day server-side and passes the compact day map (not raw activities) to the sidebar
-- [ ] All reads go through `findActivities`, so the demo window applies; for a demo session "today" is the end of the demo window, so the sidebar shows a populated week
-- [ ] Add an Activity Sidebar section to `/how-to-use`
+- [x] Pure helpers in `lib/activitySummary.ts` working on `yyyy-MM-dd` day keys (time-zone-free once bucketed), unit-checked with a small script on edge cases: streak across a rest week, a run at 11:30 pm ET, months starting on Sunday
+- [x] `runs/page.tsx` buckets runs per local day server-side and passes the compact day map (not raw activities) to the sidebar
+- [x] All reads go through `findActivities`, so the demo window applies; for a demo session "today" is the end of the demo window, so the sidebar shows a populated week
+- [x] Add an Activity Sidebar section to `/how-to-use`
 
-- [ ] **Test**: the streak survives rest days and breaks after a full week with no run; a new synced run lights up today's circle and month dot after clicking Sync; the goal ring updates for both runs and distance goals; switching the time zone in Settings moves a late-evening run to the right day; ‹ › pages months with correct totals; no horizontal overflow at 390 px
+*Implementation notes (as built, 2026-10-28):*
+- Weekly goal and time zone live on the single-row `UserSettings` (`weeklyGoalType`, `weeklyGoalTarget`, `timeZone`) rather than a new table; apply with `npx prisma db push` like the wave 13 columns
+- Where the sidebar sits beside the table (`lg` and up), the runs table drops its Source badge column and tightens cell padding so names and paces stay on one line; the badge still shows on narrower screens
+- Edge cases checked with a throwaway script against the built helpers, run with the process in a non-ET time zone: an 11:30 pm ET run lands on its ET day (and moves a day when the setting is UTC), streak holds through an empty current week and breaks after a full empty week, Oct 2026 grid starts Thursday and Nov 2026 Sunday, leap February, year rollover in month paging
+
+- [x] **TEST**: the streak survives rest days and breaks after a full week with no run; a new synced run lights up today's circle and month dot after clicking Sync; the goal ring updates for both runs and distance goals; switching the time zone in Settings moves a late-evening run to the right day; ‹ › pages months with correct totals; no horizontal overflow at 390 px
 
 ---
 

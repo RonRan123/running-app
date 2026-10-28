@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { findActivities } from '@/lib/activities'
 import { bestEfforts, predictRaceTime, type EffortActivity } from '@/lib/records'
 import GoalsView from '@/components/goals/GoalsView'
+import { weeklyGoalFrom } from '@/lib/userSettings'
 
 function asNumberArray(value: unknown): number[] | null {
   return Array.isArray(value) && value.every(v => typeof v === 'number')
@@ -13,8 +14,9 @@ function asNumberArray(value: unknown): number[] | null {
 
 export default async function GoalsPage() {
   const session = await getServerSession(authOptions)
-  const [goals, activities] = await Promise.all([
+  const [goals, settings, activities] = await Promise.all([
     prisma.raceGoal.findMany({ orderBy: { date: 'asc' } }),
+    prisma.userSettings.findUnique({ where: { id: 1 } }),
     findActivities(session, {
       orderBy: { date: 'asc' },
       select: {
@@ -54,6 +56,8 @@ export default async function GoalsPage() {
         prediction: predictRaceTime(records, g.distance),
       }))}
       records={records}
+      weeklyGoal={weeklyGoalFrom(settings)}
+      isDemo={!!session?.isDemo}
     />
   )
 }

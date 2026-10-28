@@ -7,6 +7,8 @@ import RaceGoalCard from './RaceGoalCard'
 import GoalForm from './GoalForm'
 import PrBoard from './PrBoard'
 import PrProgression from './PrProgression'
+import WeeklyGoalCard from './WeeklyGoalCard'
+import type { WeeklyGoal } from '@/lib/activitySummary'
 
 export interface GoalWithPrediction {
   id: string
@@ -20,9 +22,13 @@ export interface GoalWithPrediction {
 export default function GoalsView({
   goals,
   records,
+  weeklyGoal,
+  isDemo,
 }: {
   goals: GoalWithPrediction[]
   records: DistanceRecord[]
+  weeklyGoal: WeeklyGoal | null
+  isDemo: boolean
 }) {
   const { unit, changeUnit } = useUnit()
 
@@ -36,6 +42,12 @@ export default function GoalsView({
           </p>
         </div>
         <UnitToggle unit={unit} onChange={changeUnit} />
+      </div>
+
+      <div className="space-y-4">
+        <h2 className="text-base font-semibold text-zinc-900">Weekly Goal</h2>
+        {/* key: re-seed the form from the saved goal when the unit toggles */}
+        <WeeklyGoalCard key={unit} goal={weeklyGoal} unit={unit} readOnly={isDemo} />
       </div>
 
       <div className="space-y-4">
