@@ -185,7 +185,7 @@ export default function HrChart({
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-3 text-xs text-zinc-500">
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded-sm border border-zinc-200 bg-white" />
-            Running {formatDuration(gait.run.seconds)} (
+            Running {formatDuration(Math.round(gait.run.seconds))} (
             {Math.round((gait.run.seconds / totalGaitSec) * 100)}%)
             {gait.run.avgHr != null ? ` · avg ${gait.run.avgHr} bpm` : ''}
           </span>
@@ -194,7 +194,7 @@ export default function HrChart({
               className="inline-block w-3 h-3 rounded-sm"
               style={{ backgroundColor: WALK_FILL, opacity: 0.25 }}
             />
-            Walking {formatDuration(gait.walk.seconds)} (
+            Walking {formatDuration(Math.round(gait.walk.seconds))} (
             {Math.round((gait.walk.seconds / totalGaitSec) * 100)}%)
             {gait.walk.avgHr != null ? ` · avg ${gait.walk.avgHr} bpm` : ''}
           </span>
