@@ -1,4 +1,5 @@
 import { addDays, differenceInCalendarDays, format, startOfDay, startOfWeek } from 'date-fns'
+import type { MovementSplit } from '@/lib/runAnalysis'
 
 // Most HR-based analysis works from per-run average HR. The effort
 // distribution chart is the exception: it uses per-sample time-in-zone
@@ -25,6 +26,8 @@ export interface AnalysisActivity {
   // Running form from cadence + velocity streams; null without a cadence stream.
   cadenceSpm?: number | null
   stepLengthM?: number | null
+  // Running / walking / stopped seconds over the full elapsed time.
+  movement?: MovementSplit | null
 }
 
 // Assumed resting HR for TRIMP — not collected anywhere in the app.

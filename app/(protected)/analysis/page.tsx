@@ -4,7 +4,7 @@ import { findActivities } from '@/lib/activities'
 import AnalysisView from '@/components/analysis/AnalysisView'
 import { hrProfile, zonesOn } from '@/lib/analysis'
 import { prisma } from '@/lib/prisma'
-import { runningForm, timeInZones } from '@/lib/runAnalysis'
+import { movementSplit, runningForm, timeInZones } from '@/lib/runAnalysis'
 
 export const metadata = {
   title: 'Analysis — Running Dashboard',
@@ -31,7 +31,7 @@ export default async function AnalysisPage() {
     },
   })
 
-  // Time-in-zone and running form are computed from streams here so raw
+  // Time-in-zone, running form and run/walk split are computed from streams here so raw
   // streams never ship to the client. Zones use the runner's age on each
   // run's date (birthday in Settings → Training).
   const profile = hrProfile(settings, activities)
@@ -60,6 +60,14 @@ export default async function AnalysisPage() {
           zoneSeconds: hasTime ? secs : null,
           cadenceSpm: form?.cadenceSpm ?? null,
           stepLengthM: form?.stepLengthM ?? null,
+          movement: time
+            ? movementSplit(
+                time,
+                aligned(cadence) ? cadence : null,
+                aligned(velocity) ? velocity : null,
+                aligned(distance) ? distance : null,
+              )
+            : null,
         }
       })}
     />
