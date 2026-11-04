@@ -84,6 +84,91 @@ export function runningForm(
   return { cadenceSpm, stepLengthM: meters / steps }
 }
 
+export type Movement = 'running' | 'walking' | 'stopped'
+
+export interface MovementSplit {
+  runningSec: number
+  walkingSec: number
+  stoppedSec: number
+  longestRunSec: number // longest unbroken running stretch
+  breaks: number        // walks or stops ≥ MIN_BREAK_SEC, including at either end
+}
+
+// Cadence bands (steps/min, both feet). Real data is bimodal: walking sits
+// around 100–120 spm, running 140–160, with little in between.
+const RUN_MIN_SPM = 130
+const WALK_MIN_SPM = 60
+// Above this the cadence reading is a glitch — fall back to speed.
+const MAX_PLAUSIBLE_SPM = 230
+// Speed bands used when cadence is missing or zero (dropouts happen mid-run).
+const STOPPED_MAX_SPEED = 0.5 // m/s — standing at a light, shuffling in place
+const WALK_MAX_SPEED = 1.9    // m/s (~8:46 min/km)
+// Smart recording logs every few seconds; longer gaps are auto-pauses or
+// GPS dropouts and get classified by the distance covered across the gap.
+const MAX_SAMPLE_GAP = 10
+// Non-running stretches shorter than this are sensor blips, not breaks.
+const MIN_BREAK_SEC = 10
+
+/**
+ * Seconds running, walking and stopped across the run's full elapsed time.
+ * Stops (traffic lights, pauses) stay in the total — nothing is trimmed —
+ * so the split reflects the run as it actually happened.
+ */
+export function movementSplit(
+  time: number[],
+  cadence: number[] | null,
+  velocity: number[] | null,
+  distance: number[] | null,
+): MovementSplit | null {
+  if (!cadence && !velocity) return null
+  const spm = cadence ? normalizeCadence(cadence) : null
+
+  const bySpeed = (v: number): Movement =>
+    v < STOPPED_MAX_SPEED ? 'stopped' : v < WALK_MAX_SPEED ? 'walking' : 'running'
+
+  const classify = (i: number, dt: number): Movement => {
+    if (dt > MAX_SAMPLE_GAP && distance) {
+      const dd = distance[i] - distance[i - 1]
+      if (dd >= 0) return bySpeed(dd / dt)
+    }
+    // Running cadence wins over speed: treadmills report ~0 m/s.
+    const s = spm?.[i] ?? 0
+    if (s >= RUN_MIN_SPM && s <= MAX_PLAUSIBLE_SPM) return 'running'
+    const v = velocity?.[i] ?? 0
+    if (velocity && v < STOPPED_MAX_SPEED) return 'stopped'
+    if (s >= WALK_MIN_SPM && s < RUN_MIN_SPM) return 'walking'
+    return velocity ? bySpeed(v) : 'stopped'
+  }
+
+  const out = { runningSec: 0, walkingSec: 0, stoppedSec: 0, longestRunSec: 0, breaks: 0 }
+  let stretch = 0 // current running stretch, including blips inside it
+  let pause = 0   // current non-running time since the last running sample
+  for (let i = 1; i < time.length; i++) {
+    const dt = time[i] - time[i - 1]
+    if (!(dt > 0)) continue
+    const m = classify(i, dt)
+    out[`${m}Sec`] += dt
+    if (m !== 'running') {
+      pause += dt
+      continue
+    }
+    // Warm-up and cool-down walks count too: if the watch recorded it, it's
+    // part of the run.
+    if (pause >= MIN_BREAK_SEC) {
+      out.longestRunSec = Math.max(out.longestRunSec, stretch)
+      out.breaks++
+      stretch = dt
+    } else {
+      stretch += pause + dt
+    }
+    pause = 0
+  }
+  if (pause >= MIN_BREAK_SEC && out.runningSec > 0) out.breaks++
+  out.longestRunSec = Math.max(out.longestRunSec, stretch)
+  const total = out.runningSec + out.walkingSec + out.stoppedSec
+  return total >= 120 ? out : null
+}
+
 /** Rolling time-window average — smooths noisy per-sample series for display. */
 export function smoothSeries(time: number[], values: number[], windowSec = 30): number[] {
   const out = new Array<number>(values.length)
