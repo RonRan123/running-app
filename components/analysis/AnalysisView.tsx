@@ -11,10 +11,13 @@ import {
   longRunByWeek,
   weeklyVolume,
   weeklyTimeInZones,
+  withoutExcluded,
   type AnalysisActivity,
   type HrProfile,
   zonesOn,
 } from '@/lib/analysis'
+import { dayKeyInZone } from '@/lib/activitySummary'
+import { planNextWeek } from '@/lib/trainingPlan'
 import AerobicScatter from './AerobicScatter'
 import EfficiencyTrend from './EfficiencyTrend'
 import ZoneDistribution from './ZoneDistribution'
@@ -24,15 +27,18 @@ import WeeklyVolumeChart from './WeeklyVolumeChart'
 import FitnessFatigue from './FitnessFatigue'
 import LoadRatioCard from './LoadRatioCard'
 import LongRunProgression from './LongRunProgression'
+import TrainingPlanCard from './TrainingPlanCard'
 import WeatherPerformance from './WeatherPerformance'
 import Zone2PaceTrend from './Zone2PaceTrend'
 
 export default function AnalysisView({
   activities,
   profile,
+  timeZone,
 }: {
   activities: AnalysisActivity[]
   profile: HrProfile
+  timeZone: string
 }) {
   const { unit, changeUnit } = useUnit()
 
@@ -63,8 +69,17 @@ export default function AnalysisView({
   const zones = useMemo(() => zonesOn(profile, today), [profile, today])
   const weeklyZones = useMemo(() => weeklyTimeInZones(inRange, profile), [inRange, profile])
   const weeklyVol = useMemo(() => weeklyVolume(inRange, range.from, range.to), [inRange, range])
-  const load = useMemo(() => fitnessFatigue(activities, profile), [activities, profile])
+  // Training load skips runs with known-bad data (EXCLUDED_ACTIVITY_IDS).
+  const load = useMemo(
+    () => fitnessFatigue(withoutExcluded(activities), profile),
+    [activities, profile],
+  )
   const loadRatio = useMemo(() => acuteChronicRatio(load), [load])
+  const plan = useMemo(
+    () =>
+      planNextWeek({ activities, profile, timeZone, today: dayKeyInZone(new Date(), timeZone) }),
+    [activities, profile, timeZone],
+  )
   const longRuns = useMemo(() => longRunByWeek(activities), [activities])
 
   return (
@@ -111,11 +126,12 @@ export default function AnalysisView({
           Computed from your full history — these windows are fixed, not affected by the date range
           above.
         </p>
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <FitnessFatigue load={load} />
+        <div className="space-y-6">
+          <FitnessFatigue load={load} />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <LoadRatioCard ratio={loadRatio} />
+            <TrainingPlanCard plan={plan} unit={unit} />
           </div>
-          <LoadRatioCard ratio={loadRatio} />
         </div>
       </div>
       <LongRunProgression weeks={longRuns} unit={unit} />

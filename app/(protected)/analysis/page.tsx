@@ -4,6 +4,7 @@ import { findActivities } from '@/lib/activities'
 import AnalysisView from '@/components/analysis/AnalysisView'
 import { hrProfile, zonesOn } from '@/lib/analysis'
 import { prisma } from '@/lib/prisma'
+import { timeZoneFrom } from '@/lib/userSettings'
 import { movementSplit, runningForm, timeInZones } from '@/lib/runAnalysis'
 
 export const metadata = {
@@ -39,6 +40,7 @@ export default async function AnalysisPage() {
   return (
     <AnalysisView
       profile={profile}
+      timeZone={timeZoneFrom(settings)}
       activities={activities.map(({ stream, ...a }) => {
         const time = stream?.time as number[] | undefined
         const hr = stream?.heartrate as number[] | null | undefined
