@@ -20,7 +20,7 @@ import ChartCard, { ChartEmpty } from './ChartCard'
 const ROLLING_DAYS = 28
 const DAY_MS = 86_400_000
 
-const COLORS = { running: '#6366f1', walking: '#fb923c', stopped: '#d4d4d8' }
+const COLORS = { running: '#6366f1', walking: '#fb923c', stopped: '#a1a1aa' }
 
 type View = 'pct' | 'time'
 
@@ -179,12 +179,15 @@ export default function RunWalkSplit({ activities }: { activities: AnalysisActiv
             <div className="lg:col-span-2">
               <p className="text-xs font-medium text-zinc-700 mb-1">Time split per run</p>
               <ResponsiveContainer width="100%" height={240}>
-                <ComposedChart data={points} margin={{ top: 8, right: 8, bottom: 4, left: -16 }}>
+                <ComposedChart data={points} margin={{ top: 8, right: 8, bottom: 4, left: -8 }}>
                   <CartesianGrid stroke="#f4f4f5" vertical={false} />
                   <XAxis dataKey="ts" tickFormatter={ts => format(ts, 'MMM d')} {...axisProps} />
                   <YAxis
                     domain={view === 'pct' ? [0, 100] : [0, 'auto']}
-                    tickFormatter={v => (view === 'pct' ? `${v}%` : `${v}m`)}
+                    // Shares can sum to 100.00001 in floating point.
+                    allowDataOverflow={view === 'pct'}
+                    ticks={view === 'pct' ? [0, 25, 50, 75, 100] : undefined}
+                    tickFormatter={v => (view === 'pct' ? `${v}%` : `${Math.round(v)}m`)}
                     {...axisProps}
                   />
                   <Tooltip
@@ -194,22 +197,12 @@ export default function RunWalkSplit({ activities }: { activities: AnalysisActiv
                       return active && p ? <SplitTooltip p={p} /> : null
                     }}
                   />
-                  <Legend
-                    formatter={value =>
-                      String(value).startsWith('running')
-                        ? String(value).endsWith('Avg')
-                          ? `${ROLLING_DAYS}-day running share`
-                          : 'Running'
-                        : String(value).startsWith('walking')
-                          ? 'Walking'
-                          : 'Stopped'
-                    }
-                    wrapperStyle={{ fontSize: 12 }}
-                  />
-                  <Bar dataKey={`running${suffix}`} stackId="split" fill={COLORS.running} />
-                  <Bar dataKey={`walking${suffix}`} stackId="split" fill={COLORS.walking} />
+                  <Legend itemSorter={null} wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey={`running${suffix}`} name="Running" stackId="split" fill={COLORS.running} />
+                  <Bar dataKey={`walking${suffix}`} name="Walking" stackId="split" fill={COLORS.walking} />
                   <Bar
                     dataKey={`stopped${suffix}`}
+                    name="Stopped"
                     stackId="split"
                     fill={COLORS.stopped}
                     radius={[3, 3, 0, 0]}
@@ -217,6 +210,7 @@ export default function RunWalkSplit({ activities }: { activities: AnalysisActiv
                   {view === 'pct' && (
                     <Line
                       dataKey="runningPctAvg"
+                      name={`${ROLLING_DAYS}-day running share`}
                       stroke="#18181b"
                       strokeWidth={2}
                       dot={false}
@@ -232,7 +226,7 @@ export default function RunWalkSplit({ activities }: { activities: AnalysisActiv
                 Longest continuous run (min)
               </p>
               <ResponsiveContainer width="100%" height={240}>
-                <ComposedChart data={points} margin={{ top: 8, right: 8, bottom: 4, left: -16 }}>
+                <ComposedChart data={points} margin={{ top: 8, right: 8, bottom: 4, left: -8 }}>
                   <CartesianGrid stroke="#f4f4f5" />
                   <XAxis
                     dataKey="ts"

@@ -91,7 +91,7 @@ export interface MovementSplit {
   walkingSec: number
   stoppedSec: number
   longestRunSec: number // longest unbroken running stretch
-  breaks: number        // walks or stops that interrupt running, ≥ MIN_BREAK_SEC
+  breaks: number        // walks or stops ≥ MIN_BREAK_SEC, including at either end
 }
 
 // Cadence bands (steps/min, both feet). Real data is bimodal: walking sits
@@ -152,9 +152,9 @@ export function movementSplit(
       pause += dt
       continue
     }
-    // A break only counts once running resumes, so a warm-up or cool-down
-    // walk at either end isn't one.
-    if (pause >= MIN_BREAK_SEC && stretch > 0) {
+    // Warm-up and cool-down walks count too: if the watch recorded it, it's
+    // part of the run.
+    if (pause >= MIN_BREAK_SEC) {
       out.longestRunSec = Math.max(out.longestRunSec, stretch)
       out.breaks++
       stretch = dt
@@ -163,6 +163,7 @@ export function movementSplit(
     }
     pause = 0
   }
+  if (pause >= MIN_BREAK_SEC && out.runningSec > 0) out.breaks++
   out.longestRunSec = Math.max(out.longestRunSec, stretch)
   const total = out.runningSec + out.walkingSec + out.stoppedSec
   return total >= 120 ? out : null
