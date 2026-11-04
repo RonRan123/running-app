@@ -107,6 +107,104 @@ export function smoothSeries(time: number[], values: number[], windowSec = 30): 
   return out
 }
 
+export type Gait = 'run' | 'walk'
+
+export interface GaitSegment {
+  gait: Gait
+  start: number // seconds elapsed (inclusive)
+  end: number   // seconds elapsed
+}
+
+// Walking cadence sits around 100–130 spm; even a slow jog is ~150+.
+const WALK_CADENCE_MAX = 140 // steps/min
+// Used only when there's no cadence stream: ~9:15 min/km, ~14:54 min/mi.
+const WALK_SPEED_MAX = 1.8 // m/s
+// Shorter flips than this (a stoplight, a GPS blip) get absorbed by their neighbours.
+const MIN_GAIT_SEGMENT_SEC = 20
+
+/**
+ * Splits a run into contiguous walking / running stretches.
+ *
+ * Cadence is the primary signal because it separates the two gaits cleanly
+ * regardless of pace or terrain (a steep uphill jog can be slower than a
+ * brisk walk). Speed is the fallback when no cadence was recorded. Stopped
+ * samples count as walking. Both signals are smoothed over 15 s, then short
+ * segments are merged away so the shading isn't flickery.
+ */
+export function gaitSegments(streams: RunStreams): GaitSegment[] {
+  const { time, cadence, velocity } = streams
+  if (time.length < 2) return []
+
+  let gait: Gait[]
+  if (cadence && cadence.some(c => c > 0)) {
+    const spm = smoothSeries(time, normalizeCadence(cadence), 15)
+    gait = spm.map(c => (c < WALK_CADENCE_MAX ? 'walk' : 'run'))
+  } else if (velocity) {
+    const v = smoothSeries(time, velocity, 15)
+    gait = v.map(x => (x < WALK_SPEED_MAX ? 'walk' : 'run'))
+  } else {
+    return []
+  }
+
+  let segs: GaitSegment[] = []
+  for (let i = 0; i < time.length; i++) {
+    const last = segs[segs.length - 1]
+    if (last && last.gait === gait[i]) last.end = time[i]
+    else {
+      if (last) last.end = time[i]
+      segs.push({ gait: gait[i], start: time[i], end: time[i] })
+    }
+  }
+
+  // Repeatedly fold the shortest too-short segment into its neighbours.
+  for (;;) {
+    let idx = -1
+    for (let i = 0; i < segs.length; i++) {
+      const len = segs[i].end - segs[i].start
+      if (segs.length > 1 && len < MIN_GAIT_SEGMENT_SEC &&
+          (idx < 0 || len < segs[idx].end - segs[idx].start)) idx = i
+    }
+    if (idx < 0) break
+    const flipped = segs[idx].gait === 'run' ? 'walk' : 'run'
+    segs[idx] = { ...segs[idx], gait: flipped }
+    const merged: GaitSegment[] = []
+    for (const s of segs) {
+      const last = merged[merged.length - 1]
+      if (last && last.gait === s.gait) last.end = s.end
+      else merged.push({ ...s })
+    }
+    segs = merged
+  }
+  return segs
+}
+
+/** Time-weighted average HR and total seconds for each gait. */
+export function gaitSummary(time: number[], heartrate: number[] | null, segs: GaitSegment[]) {
+  const out: Record<Gait, { seconds: number; avgHr: number | null }> = {
+    run: { seconds: 0, avgHr: null },
+    walk: { seconds: 0, avgHr: null },
+  }
+  const hrSum: Record<Gait, number> = { run: 0, walk: 0 }
+  const hrSec: Record<Gait, number> = { run: 0, walk: 0 }
+  let s = 0
+  for (let i = 1; i < time.length; i++) {
+    const dt = time[i] - time[i - 1]
+    if (dt <= 0) continue
+    while (s < segs.length - 1 && time[i] > segs[s].end) s++
+    const g = segs[s]?.gait
+    if (!g) continue
+    out[g].seconds += dt
+    if (heartrate && heartrate[i] > 0) {
+      hrSum[g] += heartrate[i] * dt
+      hrSec[g] += dt
+    }
+  }
+  for (const g of ['run', 'walk'] as const) {
+    if (hrSec[g] > 0) out[g].avgHr = Math.round(hrSum[g] / hrSec[g])
+  }
+  return out
+}
+
 /**
  * Minetti energy-cost polynomial for running on a gradient (J/kg/m).
  * C(0) = 3.6 on the flat; the ratio C(g)/C(0) converts real velocity into
