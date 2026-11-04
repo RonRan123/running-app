@@ -23,7 +23,7 @@ import {
   type RunStreams,
 } from '@/lib/runAnalysis'
 
-const WALK_FILL = '#38bdf8'
+const WALK_FILL = '#64748b'
 
 interface Point {
   t: number // seconds elapsed
@@ -86,7 +86,7 @@ export default function HrChart({
       : 'Set your age above to draw the Maffetone (180 − age) target band.'
 
   const subtitleWithGait = walkAreas.length
-    ? `${subtitle} Blue shading = walking or stopped.`
+    ? `${subtitle} Grey shading = walking or stopped.`
     : subtitle
 
   const totalGaitSec = gait ? gait.run.seconds + gait.walk.seconds : 0
@@ -105,7 +105,7 @@ export default function HrChart({
                 x1={a.x1}
                 x2={a.x2}
                 fill={WALK_FILL}
-                fillOpacity={0.14}
+                fillOpacity={0.1}
                 strokeOpacity={0}
               />
             ))}
