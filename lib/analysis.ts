@@ -30,6 +30,16 @@ export interface AnalysisActivity {
   movement?: MovementSplit | null
 }
 
+// Runs with bad data, left out of training load (Fitness & Fatigue, the
+// acute:chronic ratio and the 7-day plan). They still show everywhere else.
+export const EXCLUDED_ACTIVITY_IDS = new Set([
+  'cmr6tqaci001fcaud052u0ayv', // 2026-05-09: 17.7 km in 92 min at HR 152 — GPS glitch
+])
+
+export function withoutExcluded<T extends { id: string }>(activities: T[]): T[] {
+  return activities.filter(a => !EXCLUDED_ACTIVITY_IDS.has(a.id))
+}
+
 // Assumed resting HR for TRIMP — not collected anywhere in the app.
 const REST_HR = 60
 // Fallback when no activity has a recorded max HR.
@@ -173,16 +183,20 @@ export interface LoadPoint {
  * CTL: 42-day EWMA (fitness). ATL: 7-day EWMA (fatigue).
  * TSB: yesterday's CTL − ATL (form/readiness going into the day).
  * The EWMA runs from the first activity so the returned window is warmed up.
+ * `today` is the last day computed — the training planner passes a future
+ * day to project the load of planned runs.
  */
 export function fitnessFatigue(
   activities: AnalysisActivity[],
   profile: HrProfile,
   windowDays = 183,
+  today: Date = new Date(),
 ): LoadPoint[] {
   if (activities.length === 0) return []
 
+  const lastDay = startOfDay(today)
   const dailyTrimp = new Map<string, number>()
-  let firstDay = startOfDay(new Date())
+  let firstDay = lastDay
   for (const a of activities) {
     const day = startOfDay(new Date(a.date))
     if (day < firstDay) firstDay = day
@@ -190,8 +204,7 @@ export function fitnessFatigue(
     dailyTrimp.set(key, (dailyTrimp.get(key) ?? 0) + trimp(a, zonesOn(profile, a.date).maxHr))
   }
 
-  const today = startOfDay(new Date())
-  const totalDays = differenceInCalendarDays(today, firstDay) + 1
+  const totalDays = differenceInCalendarDays(lastDay, firstDay) + 1
   const points: LoadPoint[] = []
   let ctl = 0
   let atl = 0
