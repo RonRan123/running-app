@@ -6,7 +6,7 @@ import AppShell from '@/components/AppShell'
 import OpenFromHash from './OpenFromHash'
 
 export const metadata = {
-  title: 'How RUNNA Works — Running Dashboard',
+  title: 'How RONR Works — Running Dashboard',
   description: 'What the running dashboard shows, how to read every chart, and a simple weekly routine.',
 }
 
@@ -26,7 +26,7 @@ function PublicHeader() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           <img src="/favicon.ico" alt="" className="h-6 w-6" />
-          <span className="text-sm font-bold tracking-widest text-zinc-900">RUNNA</span>
+          <span className="text-sm font-bold tracking-widest text-zinc-900">RONR</span>
         </Link>
         <div className="flex items-center gap-2">
           <Link
@@ -160,9 +160,9 @@ export default async function GuidePage() {
 
       <div className="space-y-12 max-w-3xl min-w-0">
         <div className="space-y-3">
-          <h1 className="text-2xl font-semibold text-zinc-900">How RUNNA works</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900">How RONR works</h1>
           <p className="text-zinc-600 leading-relaxed">
-            RUNNA is a personal running dashboard. It reads the runs from your GPS watch and answers
+            RONR is a personal running dashboard. It reads the runs from your GPS watch and answers
             one question every week: <strong>is my aerobic base growing, without getting hurt?</strong>{' '}
             You never log anything by hand. Just run, then check in here.
           </p>

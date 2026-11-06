@@ -214,11 +214,11 @@ The deep insight: a scatter plot of HR over time is motivating, but nothing beat
 ### Wave 9 — Branding & Public Landing Page
 > Goal: Give the app a public face and a proper identity before sharing it.
 
-- [x] App renamed to **RUNNA**
+- [x] App renamed to **RONR**
 - [x] Public landing page at `/` — full-screen Central Park hero image, "Track Every Mile. Own Every Run." headline, brief app description, Get Started CTA
-- [x] Strava-style nav: RUNNA logo (favicon) top-left, Log In button top-right
+- [x] Strava-style nav: RONR logo (favicon) top-left, Log In button top-right
 - [x] Password updated to `Running-Ninja-Knicks23`
-- [x] Page title and metadata updated to RUNNA throughout
+- [x] Page title and metadata updated to RONR throughout
 
 ---
 
@@ -352,7 +352,7 @@ A single explanatory page that gives any user — including the demo account —
 - [ ] New `/how-to-use` route (`app/(protected)/how-to-use/page.tsx`) added to the main nav between Goals and Settings
 - [ ] Page is purely static/server-rendered — no data fetching, no interactivity, no charts
 - [ ] Content is structured in three parts:
-  1. **Overview** — what RUNNA is and the philosophy behind it: train by feel + data, build aerobic base first, protect yourself from injury through load awareness
+  1. **Overview** — what RONR is and the philosophy behind it: train by feel + data, build aerobic base first, protect yourself from injury through load awareness
   2. **Page-by-page guide** — one section per nav item (Dashboard, Runs, Heatmap, Analysis, Goals, Deep Dive within Runs) explaining what each page shows and what action it implies
   3. **Analysis deep dive** — a longer section covering every chart on the Analysis page in plain language: what it measures, how it's calculated, what a good vs. concerning trend looks like, and what to do about it — specifically covering Weekly Volume, Aerobic Development scatter, Aerobic Efficiency, Aerobic Pace (Zone 2), Effort Distribution, Fitness & Fatigue (CTL/ATL/TSB with the TRIMP formula explained), Acute:Chronic Load Ratio, and Long Run Progression
 - [ ] Writing tone: plain English, no assumed running-science knowledge — explain what "Zone 2", "TRIMP", "CTL", "dew point" etc. mean inline rather than treating them as known terms
