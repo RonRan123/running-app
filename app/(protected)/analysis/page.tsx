@@ -41,6 +41,7 @@ export default async function AnalysisPage() {
     <AnalysisView
       profile={profile}
       timeZone={timeZoneFrom(settings)}
+      showAll={!!session?.isDemo}
       activities={activities.map(({ stream, ...a }) => {
         const time = stream?.time as number[] | undefined
         const hr = stream?.heartrate as number[] | null | undefined

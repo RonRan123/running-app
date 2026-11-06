@@ -9,9 +9,11 @@ import type { GoalWithPrediction } from './GoalsView'
 export default function RaceGoalCard({
   goal,
   unit,
+  readOnly = false,
 }: {
   goal: GoalWithPrediction
   unit: Unit
+  readOnly?: boolean
 }) {
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
@@ -43,13 +45,15 @@ export default function RaceGoalCard({
             {formatDistance(goal.distance, unit)}
           </p>
         </div>
-        <button
-          onClick={remove}
-          disabled={deleting}
-          className="text-xs text-zinc-400 hover:text-red-600 transition-colors disabled:opacity-50"
-        >
-          Delete
-        </button>
+        {!readOnly && (
+          <button
+            onClick={remove}
+            disabled={deleting}
+            className="text-xs text-zinc-400 hover:text-red-600 transition-colors disabled:opacity-50"
+          >
+            Delete
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 mt-4">

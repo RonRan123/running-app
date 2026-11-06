@@ -59,11 +59,11 @@ export default function GoalsView({
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {goals.map(g => (
-              <RaceGoalCard key={g.id} goal={g} unit={unit} />
+              <RaceGoalCard key={g.id} goal={g} unit={unit} readOnly={isDemo} />
             ))}
           </div>
         )}
-        <GoalForm />
+        {!isDemo && <GoalForm />}
       </div>
 
       <div className="space-y-4">

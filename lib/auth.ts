@@ -48,24 +48,12 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null
 
-        // Two fixed accounts: the real admin, and a read-only demo login
-        // whose data visibility is restricted in lib/activities.ts.
-        let user: { id: string; name: string; isDemo: boolean } | null = null
-        if (credentials.email === process.env.ADMIN_EMAIL) {
-          const hash = process.env.ADMIN_PASSWORD_HASH
-          if (hash && (await bcrypt.compare(credentials.password, hash))) {
-            user = { id: '1', name: 'Admin', isDemo: false }
-          }
-        } else if (
-          process.env.DEMO_EMAIL &&
-          credentials.email === process.env.DEMO_EMAIL
-        ) {
-          const hash = process.env.DEMO_PASSWORD_HASH
-          if (hash && (await bcrypt.compare(credentials.password, hash))) {
-            user = { id: 'demo', name: 'Demo', isDemo: true }
-          }
-        }
-        if (!user) return null
+        // The single real account. Visitors use the passwordless demo
+        // provider below instead.
+        if (credentials.email !== process.env.ADMIN_EMAIL) return null
+        const hash = process.env.ADMIN_PASSWORD_HASH
+        if (!hash || !(await bcrypt.compare(credentials.password, hash))) return null
+        const user = { id: '1', name: 'Admin', isDemo: false }
 
         // Fire-and-forget login event — never blocks auth
         const headers = req?.headers as Record<string, string | string[]> | undefined
@@ -75,6 +63,17 @@ export const authOptions: NextAuthOptions = {
         resolveGeoAndRecord(ip, userAgent)
 
         return { ...user, email: credentials.email }
+      },
+    }),
+    // Public, passwordless demo for visitors (e.g. from the blog post).
+    // Read-only, and lib/activities.ts limits it to a handful of runs. Not
+    // recorded in login history, so visitors' IPs are never stored.
+    CredentialsProvider({
+      id: 'demo',
+      name: 'demo',
+      credentials: {},
+      async authorize() {
+        return { id: 'demo', name: 'Demo', isDemo: true }
       },
     }),
   ],

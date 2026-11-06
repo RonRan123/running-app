@@ -38,6 +38,7 @@ export default async function RunsPage() {
         todayKey: dayKeyInZone(now, timeZone),
         goal: weeklyGoalFrom(settings),
       }}
+      isDemo={!!session?.isDemo}
     />
   )
 }

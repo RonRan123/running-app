@@ -2,47 +2,63 @@ import type { Session } from 'next-auth'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
-// Centralized activity data access — the ONE place that knows the demo
-// account is date-restricted. Every read of Activity rows must go through
-// these helpers instead of prisma.activity directly, so a demo session can
-// never see runs outside the admin-configured window (Settings → Demo
-// Access), no matter which page or API route is asking.
+// Centralized activity data access — the ONE place that knows the public
+// demo is restricted. Every read of Activity rows must go through these
+// helpers instead of prisma.activity directly, so a demo session can never
+// see runs outside the demo set, no matter which page or API route is asking.
 
-const DEFAULT_DEMO_FROM = new Date('2026-01-01T00:00:00')
-const DEFAULT_DEMO_TO = new Date('2026-03-31T23:59:59.999')
+const DEMO_RUN_COUNT = 10
 
-async function demoDateWindow(): Promise<Prisma.DateTimeFilter> {
-  const settings = await prisma.userSettings.findUnique({ where: { id: 1 } })
-  return {
-    gte: settings?.demoFromDate ?? DEFAULT_DEMO_FROM,
-    lte: settings?.demoToDate ?? DEFAULT_DEMO_TO,
-  }
+// New York City bounding box, matched against each run's first GPS point.
+const NYC = { minLat: 40.49, maxLat: 40.92, minLng: -74.27, maxLng: -73.68 }
+
+// The demo set only changes when a new NYC run syncs, so cache it briefly
+// rather than re-scanning every run's coordinates on each request.
+const DEMO_CACHE_MS = 5 * 60 * 1000
+let demoCache: { at: number; runs: { id: string; date: Date }[] } | null = null
+
+/** The demo set: the most recent runs that started in New York City. */
+async function demoRuns(): Promise<{ id: string; date: Date }[]> {
+  if (demoCache && Date.now() - demoCache.at < DEMO_CACHE_MS) return demoCache.runs
+  const runs = await prisma.$queryRaw<{ id: string; date: Date }[]>`
+    SELECT id, date FROM "Activity"
+    WHERE sport = 'Run' AND jsonb_typeof(coordinates) = 'array'
+      AND (coordinates->0->>'lat')::float BETWEEN ${NYC.minLat} AND ${NYC.maxLat}
+      AND (coordinates->0->>'lng')::float BETWEEN ${NYC.minLng} AND ${NYC.maxLng}
+    ORDER BY date DESC
+    LIMIT ${DEMO_RUN_COUNT}`
+  demoCache = { at: Date.now(), runs }
+  return runs
+}
+
+async function demoRunIds(): Promise<string[]> {
+  return (await demoRuns()).map(r => r.id)
 }
 
 /**
- * The latest moment this session may see runs from: the end of the demo
- * window for a demo session (if it's in the past), otherwise now. Pages that
- * show "this week" use it so the demo lands on a populated week.
+ * The latest moment this session may see runs from: the most recent demo
+ * run for a demo session, otherwise now. Pages that show "this week" use it
+ * so the demo lands on a populated week.
  */
 export async function visibleNow(session: Session | null): Promise<Date> {
   const now = new Date()
   if (!session?.isDemo) return now
-  const { lte } = await demoDateWindow()
-  return lte instanceof Date && lte < now ? lte : now
+  const [latest] = await demoRuns()
+  return latest && latest.date < now ? latest.date : now
 }
 
 /**
- * Merge the demo date restriction into a where clause. Admin sessions pass
+ * Merge the demo restriction into a where clause. Admin sessions pass
  * through untouched. The restriction lives in the WHERE itself (not a
- * post-query check), so even direct-ID lookups can't leak an out-of-window
- * run — it behaves exactly like a run that doesn't exist.
+ * post-query check), so even direct-ID lookups can't leak a run outside the
+ * demo set — it behaves exactly like a run that doesn't exist.
  */
 async function scopedWhere(
   session: Session | null,
   where: Prisma.ActivityWhereInput | undefined,
 ): Promise<Prisma.ActivityWhereInput | undefined> {
   if (!session?.isDemo) return where
-  return { ...where, date: await demoDateWindow() }
+  return { AND: [where ?? {}, { id: { in: await demoRunIds() } }] }
 }
 
 /** `prisma.activity.findMany`, restricted to the demo window for demo sessions. */
@@ -75,13 +91,13 @@ export async function findActivityById<
 }
 
 /**
- * Where-clause for SegmentEffort reads. Efforts carry a copy of their run's
- * date, so the demo window applies the same way it does to activities.
+ * Where-clause for SegmentEffort reads, restricted to efforts from demo runs
+ * for demo sessions.
  */
 export async function effortWhere(
   session: Session | null,
   where: Prisma.SegmentEffortWhereInput = {},
 ): Promise<Prisma.SegmentEffortWhereInput> {
   if (!session?.isDemo) return where
-  return { ...where, date: await demoDateWindow() }
+  return { AND: [where, { activityId: { in: await demoRunIds() } }] }
 }

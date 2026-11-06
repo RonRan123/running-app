@@ -30,9 +30,11 @@ export interface ActivitySummary {
 export default function RunsView({
   activities,
   summary,
+  isDemo,
 }: {
   activities: RunRow[]
   summary: ActivitySummary
+  isDemo: boolean
 }) {
   const { unit, changeUnit } = useUnit()
 
@@ -54,8 +56,8 @@ export default function RunsView({
         </div>
         <div className="flex items-center gap-2">
           <UnitToggle unit={unit} onChange={changeUnit} />
-          <SyncButton />
-          <UploadButton />
+          {!isDemo && <SyncButton />}
+          {!isDemo && <UploadButton />}
         </div>
       </div>
 
