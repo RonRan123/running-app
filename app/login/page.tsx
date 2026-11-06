@@ -50,7 +50,7 @@ export default function LoginPage() {
       <nav className="px-8 py-6">
         <Link href="/" className="flex items-center gap-3 w-fit">
           <img src="/favicon.ico" alt="" className="w-8 h-8" />
-          <span className="text-zinc-900 text-2xl font-bold tracking-widest">RUNNA</span>
+          <span className="text-zinc-900 text-2xl font-bold tracking-widest">RONR</span>
         </Link>
       </nav>
 

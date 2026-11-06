@@ -42,7 +42,7 @@ export default function NavBar() {
           <div className="flex items-center gap-6">
             <Link href="/runs" className="flex items-center gap-2">
               <img src="/favicon.ico" alt="" className="w-7 h-7" />
-              <span className="font-bold text-zinc-900 tracking-widest text-sm">RUNNA</span>
+              <span className="font-bold text-zinc-900 tracking-widest text-sm">RONR</span>
             </Link>
 
             {/* Desktop nav */}
@@ -103,7 +103,7 @@ export default function NavBar() {
       >
         {/* Drawer header */}
         <div className="h-14 flex items-center justify-between px-5 border-b border-zinc-100 shrink-0">
-          <span className="font-bold text-zinc-900 tracking-widest text-sm">RUNNA</span>
+          <span className="font-bold text-zinc-900 tracking-widest text-sm">RONR</span>
           <button
             className="p-2 -mr-1 rounded-lg text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
             onClick={() => setOpen(false)}
