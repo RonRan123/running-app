@@ -1,5 +1,7 @@
 'use client'
 
+import { HelpLink } from './ChartCard'
+
 const BANDS = [
   {
     max: 0.8,
@@ -32,7 +34,10 @@ export default function LoadRatioCard({ ratio }: { ratio: number | null }) {
 
   return (
     <div className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col">
-      <h2 className="text-sm font-semibold text-zinc-900">Acute : Chronic Load</h2>
+      <h2 className="text-sm font-semibold text-zinc-900 flex items-center gap-1.5">
+        Acute : Chronic Load
+        <HelpLink id="load-ratio" label="Acute : Chronic Load" />
+      </h2>
       <p className="text-xs text-zinc-500 mt-0.5">
         This week&apos;s load vs. your 6-week base. 0.8–1.3 is the validated safe-build window.
       </p>

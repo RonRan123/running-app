@@ -59,6 +59,7 @@ export default function AerobicScatter({
   return (
     <ChartCard
       title="Aerobic Development"
+      help="aerobic-development"
       subtitle={`Distance vs. average HR per run — blue = oldest in range, red = newest. A cloud drifting down means more distance at less cardiovascular cost.`}
     >
       {points.length === 0 ? (

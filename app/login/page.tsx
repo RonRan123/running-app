@@ -117,6 +117,9 @@ export default function LoginPage() {
           >
             {demoLoading ? 'Opening demo…' : 'See the app without logging in'}
           </button>
+          <Link href="/guide" className="inline-block pt-1 text-sm text-zinc-500 hover:text-zinc-900 underline underline-offset-2">
+            New here? See how it works
+          </Link>
         </div>
       </div>
       </div>

@@ -155,6 +155,7 @@ export default function WeatherPerformance({
   return (
     <ChartCard
       title="Performance vs. Weather"
+      help="weather"
       subtitle={`Aerobic efficiency vs. "feels like" temperature. Darker dots = muggier air (higher dew point). The gray curve is the quadratic best fit${
         fit?.optimal !== null && fit?.optimal !== undefined
           ? ` — it peaks near ${fit.optimal}°${imperial ? 'F' : 'C'}, your estimated optimal running temperature`

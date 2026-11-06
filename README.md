@@ -6,7 +6,7 @@ A private running dashboard for one runner. It pulls your runs from Intervals.ic
 
 **Contents:** [Features](#features) · [Getting started](#getting-started) · [Getting your data in](#getting-your-data-in) · [Weekly routine](#a-simple-weekly-routine) · [Project structure](#project-structure) · [Tech stack](#tech-stack)
 
-> New to the app? After you sign in, the **How to Use** page explains every chart and what to do about it.
+> New to the app? The **How it works** page (`/guide`, no sign-in needed) explains every page and chart, and what to do about it.
 
 ---
 
@@ -77,7 +77,7 @@ Your birthday (used to set heart-rate zones), the time zone used for days and we
 
 ### Demo account
 
-A separate read-only login you can share with others. It sees only a date window you choose and can't change or sync anything. Credentials are set in `.env.local` and should be shared directly, never committed.
+Anyone can explore the app at `/demo` (or **See the app without logging in** on the login page), no password needed. The demo is read-only and shows a sample of the 10 latest runs in New York City.
 
 ---
 
@@ -112,8 +112,6 @@ Create a `.env.local` file in the project root with these values:
 | `NEXT_PUBLIC_MAPBOX_TOKEN` | Your Mapbox token |
 | `INTERVALS_API_KEY` | *(Optional)* From Intervals.icu → Settings → API Access |
 | `INTERVALS_ATHLETE_ID` | *(Optional)* From the same page |
-| `DEMO_EMAIL` / `DEMO_PASSWORD_HASH` | *(Optional)* The shareable read-only login |
-
 To hash a password:
 
 ```bash
@@ -159,7 +157,9 @@ You never log runs by hand. Use either option, or both:
 
 ```
 app/
-  (protected)/      Signed-in pages: runs, analysis, segments, goals, settings, how-to-use
+  (protected)/      Signed-in pages: runs, analysis, segments, goals, settings
+  guide/            Public "How it works" page
+  demo/             One-click entry into the read-only demo
   api/              Route handlers: activities, sync, segments, goals, settings, auth
   login/            Sign-in page
 components/         UI, grouped by page (analysis/, deepdive/, goals/, segments/, settings/)
