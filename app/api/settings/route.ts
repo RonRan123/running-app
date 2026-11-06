@@ -8,8 +8,6 @@ function serialize(settings: UserSettings | null) {
   return {
     age: settings?.age ?? null,
     birthDate: settings?.birthDate?.toISOString().slice(0, 10) ?? null,
-    demoFromDate: settings?.demoFromDate?.toISOString() ?? null,
-    demoToDate: settings?.demoToDate?.toISOString() ?? null,
     timeZone: settings?.timeZone ?? DEFAULT_TIME_ZONE,
     weeklyGoalType: settings?.weeklyGoalType ?? null,
     weeklyGoalTarget: settings?.weeklyGoalTarget ?? null,
@@ -35,8 +33,6 @@ export async function PUT(request: Request) {
   const update: {
     age?: number
     birthDate?: Date
-    demoFromDate?: Date
-    demoToDate?: Date
     timeZone?: string
     weeklyGoalType?: string | null
     weeklyGoalTarget?: number | null
@@ -59,22 +55,6 @@ export async function PUT(request: Request) {
       return Response.json({ error: 'Age must be a whole number between 10 and 100' }, { status: 400 })
     }
     update.age = age
-  }
-
-  // Demo date window: both dates required together, from must precede to.
-  if (body?.demoFromDate !== undefined || body?.demoToDate !== undefined) {
-    const from = new Date(body?.demoFromDate)
-    const to = new Date(body?.demoToDate)
-    if (isNaN(from.getTime()) || isNaN(to.getTime())) {
-      return Response.json({ error: 'Both demo dates must be valid' }, { status: 400 })
-    }
-    if (from >= to) {
-      return Response.json({ error: 'Demo start date must be before the end date' }, { status: 400 })
-    }
-    update.demoFromDate = from
-    // Include the entire end day, whatever time the runs happened.
-    to.setHours(23, 59, 59, 999)
-    update.demoToDate = to
   }
 
   if (body?.timeZone !== undefined) {

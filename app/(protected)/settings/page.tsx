@@ -1,7 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import LoginHistory from '@/components/settings/LoginHistory'
-import DemoAccess from '@/components/settings/DemoAccess'
 import BirthdaySetting from '@/components/settings/BirthdaySetting'
 import TimeZoneSetting from '@/components/settings/TimeZoneSetting'
 
@@ -58,18 +57,6 @@ export default async function SettingsPage() {
           </div>
           <div className="px-5 py-5">
             <LoginHistory />
-          </div>
-        </section>
-      )}
-
-      {/* Demo access — admin only */}
-      {isAdmin && (
-        <section className="bg-white rounded-2xl border border-zinc-200 divide-y divide-zinc-100">
-          <div className="px-5 py-4">
-            <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wide text-xs">Demo Access</h2>
-          </div>
-          <div className="px-5 py-5">
-            <DemoAccess />
           </div>
         </section>
       )}

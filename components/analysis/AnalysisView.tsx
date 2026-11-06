@@ -35,10 +35,13 @@ export default function AnalysisView({
   activities,
   profile,
   timeZone,
+  showAll = false,
 }: {
   activities: AnalysisActivity[]
   profile: HrProfile
   timeZone: string
+  /** Open on every run instead of the last two weeks (the demo's runs are spread out). */
+  showAll?: boolean
 }) {
   const { unit, changeUnit } = useUnit()
 
@@ -51,7 +54,7 @@ export default function AnalysisView({
     return startOfDay(new Date(earliest))
   }, [activities, today])
 
-  const defaultFrom = subDays(today, 14)
+  const defaultFrom = showAll ? domainMin : subDays(today, 14)
   const [range, setRange] = useState({
     from: defaultFrom < domainMin ? domainMin : defaultFrom,
     to: today,
