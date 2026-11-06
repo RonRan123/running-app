@@ -11,6 +11,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [demoLoading, setDemoLoading] = useState(false)
+
+  async function viewDemo() {
+    setError('')
+    setDemoLoading(true)
+    const res = await signIn('demo', { redirect: false })
+    if (res?.error) {
+      setDemoLoading(false)
+      setError('Could not open the demo — please try again')
+    } else {
+      router.push('/runs')
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -93,6 +106,18 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        <div className="mt-6 text-center space-y-2">
+          <p className="text-sm text-zinc-500">Just looking around?</p>
+          <button
+            type="button"
+            onClick={viewDemo}
+            disabled={demoLoading}
+            className="w-full bg-white text-zinc-900 border border-zinc-300 rounded-lg py-2.5 text-sm font-medium hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {demoLoading ? 'Opening demo…' : 'See the app without logging in'}
+          </button>
+        </div>
       </div>
       </div>
     </div>
