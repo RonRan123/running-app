@@ -1,11 +1,10 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireSession } from '@/lib/guards'
 import { findActivities } from '@/lib/activities'
 import { Prisma } from '@prisma/client'
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  const { session, error } = await requireSession()
+  if (error) return error
 
   const activities = await findActivities(session, {
     where: { coordinates: { not: Prisma.AnyNull } },

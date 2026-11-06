@@ -15,5 +15,7 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     isDemo?: boolean
+    /** Epoch ms after which a demo session is no longer accepted. */
+    demoExpiresAt?: number
   }
 }

@@ -1,14 +1,10 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAdmin } from '@/lib/guards'
 import { prisma } from '@/lib/prisma'
 
 /** Rename and/or pin a segment. */
 export async function PATCH(request: Request, ctx: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.isDemo) {
-    return Response.json({ error: 'Demo account is read-only' }, { status: 403 })
-  }
+  const { error } = await requireAdmin()
+  if (error) return error
 
   const { id } = await ctx.params
   const body = (await request.json().catch(() => ({}))) as { name?: unknown; pinned?: unknown }

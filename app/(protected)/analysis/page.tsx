@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { findActivities } from '@/lib/activities'
 import AnalysisView from '@/components/analysis/AnalysisView'
-import { hrProfile, zonesOn } from '@/lib/analysis'
+import { hrProfile, withoutBirthDate, zonesOn } from '@/lib/analysis'
 import { prisma } from '@/lib/prisma'
 import { timeZoneFrom } from '@/lib/userSettings'
 import { movementSplit, runningForm, timeInZones } from '@/lib/runAnalysis'
@@ -36,12 +36,16 @@ export default async function AnalysisPage() {
   // streams never ship to the client. Zones use the runner's age on each
   // run's date (birthday in Settings → Training).
   const profile = hrProfile(settings, activities)
+  const isDemo = !!session?.isDemo
+  // The demo is public: send a fixed age instead of the birthday.
+  const latest = activities.at(-1)
+  const clientProfile = isDemo && latest ? withoutBirthDate(profile, latest.date) : profile
 
   return (
     <AnalysisView
-      profile={profile}
+      profile={clientProfile}
       timeZone={timeZoneFrom(settings)}
-      showAll={!!session?.isDemo}
+      isDemo={isDemo}
       activities={activities.map(({ stream, ...a }) => {
         const time = stream?.time as number[] | undefined
         const hr = stream?.heartrate as number[] | null | undefined

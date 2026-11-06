@@ -37,6 +37,8 @@ export default async function SegmentPage({ params }: { params: Promise<{ id: st
   if (!segment) notFound()
 
   const geometry = segment.geometry as unknown as LatLng[]
+  // The demo only sees segments its runs crossed.
+  if (session?.isDemo && segment.efforts.length === 0) notFound()
   const fastest = [...segment.efforts].sort((a, b) => a.elapsedSec - b.elapsedSec)
   const rankOf = new Map(fastest.map((e, i) => [e.id, i + 1]))
 

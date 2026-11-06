@@ -15,7 +15,8 @@ function asNumberArray(value: unknown): number[] | null {
 export default async function GoalsPage() {
   const session = await getServerSession(authOptions)
   const [goals, settings, activities] = await Promise.all([
-    prisma.raceGoal.findMany({ orderBy: { date: 'asc' } }),
+    // Race names and dates say where the runner will be; keep them out of the demo.
+    session?.isDemo ? [] : prisma.raceGoal.findMany({ orderBy: { date: 'asc' } }),
     prisma.userSettings.findUnique({ where: { id: 1 } }),
     findActivities(session, {
       orderBy: { date: 'asc' },

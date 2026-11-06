@@ -26,9 +26,9 @@ export default function DemoPage() {
     <div className="min-h-screen flex items-center justify-center bg-zinc-50">
       {failed ? (
         <p className="text-sm text-zinc-500">
-          Couldn&apos;t open the demo.{' '}
-          <Link href="/login" className="text-zinc-900 underline">
-            Try from the login page
+          The demo is unavailable right now. Please check back later.{' '}
+          <Link href="/" className="text-zinc-900 underline">
+            Back to home
           </Link>
         </p>
       ) : (
