@@ -25,6 +25,7 @@ export default function FitnessFatigue({ load }: { load: LoadPoint[] }) {
   return (
     <ChartCard
       title="Fitness & Fatigue"
+      help="fitness-fatigue"
       subtitle="TRIMP-based training load over the last 6 months. Fitness builds slowly (42-day average), fatigue moves fast (7-day average); form = fitness − fatigue. Positive form = fresh, ready to race."
     >
       {load.length < 14 ? (

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Map as MapboxMap, GeoJSONSource } from 'mapbox-gl'
-import { endOfDay, startOfDay } from 'date-fns'
+import { endOfDay, startOfDay, subDays } from 'date-fns'
 import DateRangeSlider from '@/components/DateRangeSlider'
 
 interface GeoActivity {
@@ -48,6 +48,44 @@ function hasToken() {
   return Boolean(TOKEN && TOKEN !== 'your_mapbox_token_here')
 }
 
+// Default view: the last RECENT_DAYS ending on the latest run, framed on
+// runs that started within NEARBY_KM of where the latest run started.
+const RECENT_DAYS = 90
+const NEARBY_KM = 25
+
+function distanceKm([lng1, lat1]: [number, number], [lng2, lat2]: [number, number]) {
+  const rad = Math.PI / 180
+  const dLat = (lat2 - lat1) * rad
+  const dLng = (lng2 - lng1) * rad
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) ** 2
+  return 6371 * 2 * Math.asin(Math.sqrt(a))
+}
+
+/** Recent date window plus the [west, south, east, north] box to open on. */
+function recentFocus(tracks: Track[]) {
+  const latest = tracks.reduce((a, b) => (b.ts > a.ts ? b : a))
+  const earliest = Math.min(...tracks.map(t => t.ts))
+  const from = startOfDay(new Date(Math.max(earliest, subDays(new Date(latest.ts), RECENT_DAYS).getTime())))
+  const origin = latest.coordinates[0]
+  const nearby = tracks.filter(
+    t => t.ts >= from.getTime() && distanceKm(t.coordinates[0], origin) <= NEARBY_KM,
+  )
+  const points = nearby.flatMap(t => t.coordinates)
+  const lngs = points.map(p => p[0])
+  const lats = points.map(p => p[1])
+  return {
+    range: { from, to: startOfDay(new Date(latest.ts)) },
+    bounds: [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)] as [
+      number,
+      number,
+      number,
+      number,
+    ],
+  }
+}
+
 function toFeatureCollection(tracks: Track[]) {
   return {
     type: 'FeatureCollection' as const,
@@ -66,7 +104,7 @@ export default function HeatmapMap() {
   const [message, setMessage] = useState<string | null>(null)
   const [tracks, setTracks] = useState<Track[]>([])
   const [segmentCount, setSegmentCount] = useState(0)
-  // null = all-time (the default view)
+  // null = all-time; set to the recent window once tracks load
   const [range, setRange] = useState<{ from: Date; to: Date } | null>(null)
 
   const domain = useMemo(() => {
@@ -120,6 +158,8 @@ export default function HeatmapMap() {
         return
       }
       setTracks(loaded)
+      const focus = recentFocus(loaded)
+      setRange(focus.range)
 
       const mapboxgl = (await import('mapbox-gl')).default
       if (cancelled || !containerRef.current) return
@@ -129,9 +169,8 @@ export default function HeatmapMap() {
       const map = new mapboxgl.Map({
         container: containerRef.current,
         style: 'mapbox://styles/mapbox/dark-v11',
-        // Default view: Manhattan. Tracks elsewhere are reachable by panning.
-        center: [-73.9712, 40.7831],
-        zoom: 11.5,
+        bounds: focus.bounds,
+        fitBoundsOptions: { padding: 40, maxZoom: 14 },
         attributionControl: false,
       })
       mapRef.current = map

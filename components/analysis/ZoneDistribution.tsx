@@ -48,6 +48,7 @@ export default function ZoneDistribution({ weekly }: { weekly: WeeklyZones[] }) 
   return (
     <ChartCard
       title="Effort Distribution"
+      help="effort-distribution"
       subtitle={`Weekly time at easy / moderate / hard effort, classified second-by-second from heart rate. Marathon training wants the easy share at or above ~${EASY_TARGET_PCT}%.`}
     >
       {weekly.length === 0 ? (

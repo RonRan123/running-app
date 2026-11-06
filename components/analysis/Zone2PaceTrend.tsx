@@ -53,6 +53,7 @@ export default function Zone2PaceTrend({
   return (
     <ChartCard
       title="Aerobic Pace"
+      help="aerobic-pace"
       subtitle={`Average pace of easy (Zone 2) runs in the selected range — currently ${current.zone2Min}–${current.easyMax} bpm, with each run judged by your zones on its date. The axis is flipped so an upward trend = faster easy pace — the number that predicts marathon potential.`}
     >
       {points.length < 3 ? (

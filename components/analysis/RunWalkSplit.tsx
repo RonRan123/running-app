@@ -129,6 +129,7 @@ export default function RunWalkSplit({ activities }: { activities: AnalysisActiv
   return (
     <ChartCard
       title="Run / Walk Split"
+      help="run-walk-split"
       subtitle={`Each run's full elapsed time classified second-by-second from cadence and speed as running, walking or stopped. Stops like traffic lights stay in. The line is the ${ROLLING_DAYS}-day running share.`}
     >
       {points.length === 0 ? (

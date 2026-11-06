@@ -14,7 +14,7 @@ import { format, parseISO } from 'date-fns'
 import type { WeeklyVolume } from '@/lib/analysis'
 import { KM_PER_MILE } from '@/lib/units'
 import type { Unit } from '@/lib/units'
-import { ChartEmpty } from './ChartCard'
+import { ChartEmpty, HelpLink } from './ChartCard'
 
 type Metric = 'miles' | 'runs' | 'avg'
 
@@ -65,7 +65,10 @@ export default function WeeklyVolumeChart({
   return (
     <div className="bg-white rounded-2xl border border-zinc-200 p-5">
       <div className="flex items-start justify-between gap-3 mb-1">
-        <h2 className="text-sm font-semibold text-zinc-900">Weekly Volume</h2>
+        <h2 className="text-sm font-semibold text-zinc-900 flex items-center gap-1.5">
+          Weekly Volume
+          <HelpLink id="weekly-volume" label="Weekly Volume" />
+        </h2>
         <select
           value={metric}
           onChange={e => setMetric(e.target.value as Metric)}

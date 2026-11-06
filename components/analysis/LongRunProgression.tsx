@@ -30,6 +30,7 @@ export default function LongRunProgression({
   return (
     <ChartCard
       title="Long Run Progression"
+      help="long-run"
       subtitle="Longest single run of each week, last 16 weeks — the marathon-block view. Look for steady growth, not spikes."
     >
       {!hasRuns ? (

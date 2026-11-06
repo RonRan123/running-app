@@ -19,12 +19,20 @@ export default function Home() {
           <img src="/favicon.ico" alt="" className="w-8 h-8" />
           <span className="text-white text-2xl font-bold tracking-widest">RONR</span>
         </div>
-        <Link
-          href="/login"
-          className="bg-white text-zinc-900 text-sm font-semibold px-6 py-2 rounded-full hover:bg-zinc-100 transition-colors"
-        >
-          Log In
-        </Link>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Link
+            href="/guide"
+            className="text-white/90 text-sm font-semibold px-3 py-2 hover:text-white transition-colors"
+          >
+            How it works
+          </Link>
+          <Link
+            href="/login"
+            className="bg-white text-zinc-900 text-sm font-semibold px-6 py-2 rounded-full hover:bg-zinc-100 transition-colors"
+          >
+            Log In
+          </Link>
+        </div>
       </nav>
 
       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-6">

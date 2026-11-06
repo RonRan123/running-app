@@ -11,7 +11,7 @@ const navLinks = [
   { href: '/segments', label: 'Segments', exact: false },
   { href: '/analysis', label: 'Analysis', exact: false },
   { href: '/goals', label: 'Goals', exact: false },
-  { href: '/how-to-use', label: 'How to Use', exact: false },
+  { href: '/guide', label: 'How to Use', exact: false },
   { href: '/settings', label: 'Settings', exact: false },
 ]
 

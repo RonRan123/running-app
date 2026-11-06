@@ -135,6 +135,7 @@ export default function RunningForm({
   return (
     <ChartCard
       title="Running Form"
+      help="running-form"
       subtitle={`Average cadence (steps per minute) and step length per run, with a ${ROLLING_DAYS}-day rolling average. Both rise with pace, so compare easy runs with easy runs.`}
     >
       <label className="flex items-center justify-end gap-2 -mt-2 mb-2 text-xs text-zinc-600">

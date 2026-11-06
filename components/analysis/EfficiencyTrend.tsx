@@ -34,6 +34,7 @@ export default function EfficiencyTrend({ activities }: { activities: AnalysisAc
   return (
     <ChartCard
       title="Aerobic Efficiency"
+      help="aerobic-efficiency"
       subtitle="Meters per minute, per heartbeat (efficiency factor). A rising line means the same cardiovascular effort is producing faster running."
     >
       {points.length < 3 ? (

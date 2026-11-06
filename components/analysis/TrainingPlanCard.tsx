@@ -3,6 +3,7 @@
 import { format, parseISO } from 'date-fns'
 import type { CalcLine, PlanDay, WeekPlan } from '@/lib/trainingPlan'
 import { KM_PER_MILE, formatPace, type Unit } from '@/lib/units'
+import { HelpLink } from './ChartCard'
 
 function distance(km: number, unit: Unit) {
   return `${(unit === 'mi' ? km / KM_PER_MILE : km).toFixed(1)} ${unit}`
@@ -54,7 +55,10 @@ export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit:
 
   return (
     <div className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col">
-      <h2 className="text-sm font-semibold text-zinc-900">Next 7 days</h2>
+      <h2 className="text-sm font-semibold text-zinc-900 flex items-center gap-1.5">
+        Next 7 days
+        <HelpLink id="training-plan" label="the training plan" />
+      </h2>
       <p className="text-sm text-zinc-500 mt-1">
         <span className="text-xl font-semibold text-zinc-900 tabular-nums">
           {plan.totalRunMin} min
