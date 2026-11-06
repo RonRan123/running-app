@@ -1,5 +1,4 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAdmin } from '@/lib/guards'
 import { prisma } from '@/lib/prisma'
 import type { UserSettings } from '@prisma/client'
 import { DEFAULT_TIME_ZONE, isValidTimeZone } from '@/lib/activitySummary'
@@ -15,19 +14,17 @@ function serialize(settings: UserSettings | null) {
 }
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  // Only admin settings screens read this; it includes the birthday.
+  const { error } = await requireAdmin()
+  if (error) return error
 
   const settings = await prisma.userSettings.findUnique({ where: { id: 1 } })
   return Response.json(serialize(settings))
 }
 
 export async function PUT(request: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.isDemo) {
-    return Response.json({ error: 'Demo account is read-only' }, { status: 403 })
-  }
+  const { error } = await requireAdmin()
+  if (error) return error
 
   const body = await request.json().catch(() => null)
   const update: {

@@ -19,7 +19,7 @@ export default function LoginPage() {
     const res = await signIn('demo', { redirect: false })
     if (res?.error) {
       setDemoLoading(false)
-      setError('Could not open the demo — please try again')
+      setError('The demo is unavailable right now — please check back later')
     } else {
       router.push('/runs')
     }

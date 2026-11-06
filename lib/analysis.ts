@@ -100,6 +100,14 @@ export function hrProfile(
   }
 }
 
+/**
+ * The profile with the birthday replaced by a fixed age as of `date`, for
+ * pages the public demo can see: zones stay right, the birthday never ships.
+ */
+export function withoutBirthDate(profile: HrProfile, date: Date | string): HrProfile {
+  return { birthDate: null, age: ageOn(profile, date), recordedMax: profile.recordedMax }
+}
+
 /** Whole years old on `date` (calendar comparison in UTC), or null if unknown. */
 export function ageOn(profile: HrProfile, date: Date | string): number | null {
   if (!profile.birthDate) return profile.age

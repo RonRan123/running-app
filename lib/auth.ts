@@ -6,6 +6,18 @@ import { prisma } from '@/lib/prisma'
 
 const AUTO_SYNC_WINDOW_DAYS = 30
 
+// Demo visitors get a short session instead of NextAuth's 30-day default.
+export const DEMO_SESSION_MS = 2 * 60 * 60 * 1000
+
+/**
+ * Off switch for the public demo: set PUBLIC_DEMO_ENABLED=false (in Vercel,
+ * then redeploy) to stop new demo sign-ins and end every demo session
+ * already open. The admin login is unaffected.
+ */
+export function demoEnabled() {
+  return process.env.PUBLIC_DEMO_ENABLED !== 'false'
+}
+
 // Private/loopback ranges that will never resolve to a real location.
 const UNROUTABLE = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|fc|fd)/i
 
@@ -73,6 +85,7 @@ export const authOptions: NextAuthOptions = {
       name: 'demo',
       credentials: {},
       async authorize() {
+        if (!demoEnabled()) return null
         return { id: 'demo', name: 'Demo', isDemo: true }
       },
     }),
@@ -82,7 +95,16 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       // `user` is only present on initial sign-in; persist the demo flag.
-      if (user) token.isDemo = user.isDemo ?? false
+      if (user) {
+        token.isDemo = user.isDemo ?? false
+        if (token.isDemo) token.demoExpiresAt = Date.now() + DEMO_SESSION_MS
+      }
+      // End demo sessions that have expired or that the off switch closed.
+      // Throwing (not returning an empty token) is what makes NextAuth drop
+      // the session: getServerSession then returns null, i.e. logged out.
+      if (token.isDemo && (!demoEnabled() || !(Date.now() < (token.demoExpiresAt ?? 0)))) {
+        throw new Error('Demo session ended')
+      }
       return token
     },
     async session({ session, token }) {

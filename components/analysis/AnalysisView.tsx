@@ -35,13 +35,13 @@ export default function AnalysisView({
   activities,
   profile,
   timeZone,
-  showAll = false,
+  isDemo = false,
 }: {
   activities: AnalysisActivity[]
   profile: HrProfile
   timeZone: string
-  /** Open on every run instead of the last two weeks (the demo's runs are spread out). */
-  showAll?: boolean
+  /** Public demo: open on every run (they're spread out) and don't print the age. */
+  isDemo?: boolean
 }) {
   const { unit, changeUnit } = useUnit()
 
@@ -54,7 +54,7 @@ export default function AnalysisView({
     return startOfDay(new Date(earliest))
   }, [activities, today])
 
-  const defaultFrom = showAll ? domainMin : subDays(today, 14)
+  const defaultFrom = isDemo ? domainMin : subDays(today, 14)
   const [range, setRange] = useState({
     from: defaultFrom < domainMin ? domainMin : defaultFrom,
     to: today,
@@ -93,7 +93,9 @@ export default function AnalysisView({
           <p className="text-sm text-zinc-500 mt-0.5">
             {inRange.length} {inRange.length === 1 ? 'run' : 'runs'} in the selected range · easy ≤{' '}
             {zones.easyMax}, hard ≥ {zones.hardMin} bpm
-            {zones.basis === 'age'
+            {isDemo
+              ? ' (Maffetone zones)'
+              : zones.basis === 'age'
               ? ` today (age ${zones.age}); each run uses your age on its date`
               : ' (from your highest recorded HR — set your birthday in Settings)'}
           </p>

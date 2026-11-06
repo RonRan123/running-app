@@ -7,28 +7,39 @@ import { prisma } from '@/lib/prisma'
 // helpers instead of prisma.activity directly, so a demo session can never
 // see runs outside the demo set, no matter which page or API route is asking.
 
-const DEMO_RUN_COUNT = 10
+// The public demo shows exactly these runs, hand-picked NYC runs, and
+// nothing else. A fixed list (rather than "latest N in NYC") means a newly
+// synced run never goes public by itself. To change it, list candidates
+// with `node --env-file=.env.local scripts/demo-candidates.mjs`.
+export const DEMO_RUN_IDS = [
+  'cmvyshfh70001be7m85zpjhs3', // Oct 31, 2026 · 6.4 mi
+  'cmten3jpy00019p58crq72676', // Aug 29, 2026 · 6.7 mi
+  'cmtb1coez000110xb416g1af7', // Aug 26, 2026 · 4.0 mi
+  'cmt4vuoqd0001px9nqzr74x2f', // Aug 22, 2026 · 5.8 mi
+  'cmr6tq2ar0000caudl3k22qqu', // Jul 4, 2026 · 4.6 mi
+  'cmr6tq2xm0003caudrjt6l7ki', // Jun 27, 2026 · 6.0 mi
+  'cmr6tq3h50006caud216sutsk', // Jun 26, 2026 · 3.2 mi
+  'cmr6tq3xy0009caudykv1by73', // Jun 20, 2026 · 5.2 mi
+  'cmr6tq4f9000ccaudz8k9tzeb', // Jun 19, 2026 · 1.2 mi
+  'cmr6tq4t4000fcaudd4subyki', // Jun 19, 2026 · 1.0 mi
+]
 
-// New York City bounding box, matched against each run's first GPS point.
-const NYC = { minLat: 40.49, maxLat: 40.92, minLng: -74.27, maxLng: -73.68 }
+// The list is fixed, so look the runs up once per server instance.
+let demoCache: Promise<{ id: string; date: Date }[]> | null = null
 
-// The demo set only changes when a new NYC run syncs, so cache it briefly
-// rather than re-scanning every run's coordinates on each request.
-const DEMO_CACHE_MS = 5 * 60 * 1000
-let demoCache: { at: number; runs: { id: string; date: Date }[] } | null = null
-
-/** The demo set: the most recent runs that started in New York City. */
-async function demoRuns(): Promise<{ id: string; date: Date }[]> {
-  if (demoCache && Date.now() - demoCache.at < DEMO_CACHE_MS) return demoCache.runs
-  const runs = await prisma.$queryRaw<{ id: string; date: Date }[]>`
-    SELECT id, date FROM "Activity"
-    WHERE sport = 'Run' AND jsonb_typeof(coordinates) = 'array'
-      AND (coordinates->0->>'lat')::float BETWEEN ${NYC.minLat} AND ${NYC.maxLat}
-      AND (coordinates->0->>'lng')::float BETWEEN ${NYC.minLng} AND ${NYC.maxLng}
-    ORDER BY date DESC
-    LIMIT ${DEMO_RUN_COUNT}`
-  demoCache = { at: Date.now(), runs }
-  return runs
+/** The demo runs that exist, newest first. */
+function demoRuns(): Promise<{ id: string; date: Date }[]> {
+  demoCache ??= prisma.activity
+    .findMany({
+      where: { id: { in: DEMO_RUN_IDS } },
+      orderBy: { date: 'desc' },
+      select: { id: true, date: true },
+    })
+    .catch(err => {
+      demoCache = null // don't cache a failed lookup
+      throw err
+    })
+  return demoCache
 }
 
 async function demoRunIds(): Promise<string[]> {

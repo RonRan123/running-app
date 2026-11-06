@@ -1,5 +1,4 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAdmin } from '@/lib/guards'
 import { prisma } from '@/lib/prisma'
 import { parseGpx } from '@/lib/parsers/gpx'
 import { parseFit } from '@/lib/parsers/fit'
@@ -7,11 +6,8 @@ import { backfillWeather } from '@/lib/weather'
 import { matchNewRuns } from '@/lib/segments/store'
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.isDemo) {
-    return Response.json({ error: 'Demo account is read-only' }, { status: 403 })
-  }
+  const { error } = await requireAdmin()
+  if (error) return error
 
   const formData = await request.formData()
   const files = formData.getAll('files') as File[]
