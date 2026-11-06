@@ -1,4 +1,6 @@
-# RUNNA — Personal Running Dashboard
+# RONR — Personal Running Dashboard
+
+*The name: RONR is short for Ron Ranjan, and it's "runner" without the vowels.*
 
 A private running dashboard for one runner. It pulls your runs from Intervals.icu (which syncs from Garmin and Strava) or from GPX/FIT files you upload, then turns them into maps, trends and coaching-style analysis built around one idea: **build a strong aerobic base, consistently, without getting hurt.**
 
