@@ -6,7 +6,7 @@ import Providers from '@/components/Providers'
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 
 export const metadata: Metadata = {
-  title: 'RUNNA',
+  title: 'RONR',
   description: 'Your personal running dashboard. Track every mile, analyze performance, and visualize your routes.',
 }
 

@@ -24,7 +24,7 @@ export default function HowToUsePage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-xl font-semibold text-zinc-900">How to Use RUNNA</h1>
+        <h1 className="text-xl font-semibold text-zinc-900">How to Use RONR</h1>
         <p className="text-sm text-zinc-500 mt-0.5">
           What everything means, and what to do about it
         </p>
@@ -32,7 +32,7 @@ export default function HowToUsePage() {
 
       <Section title="The idea behind this app">
         <p>
-          RUNNA is built around one belief: the best predictor of long-term running success is a
+          RONR is built around one belief: the best predictor of long-term running success is a
           strong <strong>aerobic base</strong> — the ability to run far at a low, comfortable
           effort — built consistently, without getting injured. Speed comes from the base, not
           instead of it.
