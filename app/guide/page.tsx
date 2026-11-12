@@ -463,11 +463,26 @@ export default async function GuidePage() {
             </Chart>
             <Chart id="training-plan" name="Next 7 days" want="follow it, keep it easy">
               <p>
-                A suggested week of easy runs built from your recent training. It grows last week by
-                about 10%, takes a cutback week (75%) after three builds in a row, and after a break of
-                a week or more ramps back in at 50 → 75 → 90 → 100% of what you were doing before. It is
-                trimmed so the projected load ratio stays at or below 1.3, and never drops below a
-                minimum week of three 30-minute runs.
+                A suggested week of easy runs for building your base. It grows last week by about 10%
+                (never more than 130% of your 4-week average, so one big week isn’t built on), takes a
+                cutback week (75%) after three builds in a row, and after a break of a week or more
+                ramps back in at 50 → 75 → 90 → 100% of what you were doing before. A return week run
+                well over its step repeats that step. It never drops below a minimum week of three
+                30-minute runs.
+              </p>
+              <p>
+                Run days are spread out, not fixed to weekdays: back-to-back days only appear in a
+                steady week of four or more runs, never while you are returning from a break, and the
+                long run sits on the weekend with a rest day after it. No single run is more than 10%
+                longer than your longest in the last 30 days.
+              </p>
+              <p>
+                The plan also reads the <strong>Acute : Chronic Load</strong> ratio (once you have 12
+                weeks of history). At 1.5 or above, a day stays a rest day until the ratio drops back
+                under 1.5, no run is longer than your recent longest, and the minimum week shrinks to
+                three 20-minute runs. Above 1.3, runs are on alternate days and the week holds instead
+                of building. The week is also trimmed so the ratio projected for its last day stays at
+                or below 1.3.
               </p>
               <p>
                 Every run is easy, under your MAF heart rate; walk when you need to stay under it. Open{' '}

@@ -39,19 +39,41 @@ function DayRow({ day, unit }: { day: PlanDay; unit: Unit }) {
       <span className="text-zinc-400 tabular-nums">{format(parseISO(day.date), 'EEE, MMM d')}</span>
       {isRun ? (
         <span className={`font-medium ${long ? 'text-blue-600' : 'text-emerald-600'}`}>
-          {long && (day.movedLong ? 'Long run (moved from Sat) ' : 'Long run ')}
+          {long && 'Long run '}
           {minutesWithDistance(day.runMin, day.distanceKm, unit, { estimated: true })}
         </span>
       ) : (
-        <span className="text-zinc-400">Rest</span>
+        <span className="text-zinc-400">
+          Rest{day.loadRest && <span className="text-rose-600"> · load ratio too high to run</span>}
+        </span>
       )}
       <span className="text-xs text-violet-600 text-right">{extras.join(' ')}</span>
     </div>
   )
 }
 
+/** Why the week looks the way it does when today's load ratio is above 1.3. */
+function loadNotice(plan: WeekPlan) {
+  if (plan.currentAcwr == null) return null
+  const ratio = plan.currentAcwr.toFixed(2)
+  if (plan.loadState === 'high') {
+    return {
+      classes: 'text-rose-700 bg-rose-50 border-rose-200',
+      text: `Load ratio ${ratio} is in the overreach zone. Rest until it is under 1.5, then run on alternate days only, with no run over ${plan.maxRunMin} min.`,
+    }
+  }
+  if (plan.loadState === 'elevated') {
+    return {
+      classes: 'text-amber-700 bg-amber-50 border-amber-200',
+      text: `Load ratio ${ratio} is above 1.3. Runs are on alternate days only, and the week holds instead of building.`,
+    }
+  }
+  return null
+}
+
 export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit: Unit }) {
   const paceLabel = plan.easyPaceMinPerKm == null ? null : formatPace(plan.easyPaceMinPerKm, unit)
+  const notice = loadNotice(plan)
 
   return (
     <div className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col">
@@ -68,6 +90,10 @@ export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit:
           ` · ${plan.changePct > 0 ? '+' : plan.changePct < 0 ? '−' : ''}${Math.abs(plan.changePct)}% vs last week`}
         {plan.tags.length > 0 && ` · ${plan.tags.join(' · ')}`}
       </p>
+
+      {notice && (
+        <p className={`mt-2 rounded-lg border px-3 py-2 text-xs ${notice.classes}`}>{notice.text}</p>
+      )}
 
       <details className="group mt-2">
         <summary className="inline-flex items-center gap-1 text-xs text-zinc-500 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-zinc-700">

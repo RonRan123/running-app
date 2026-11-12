@@ -66,6 +66,19 @@ function plan(activities: AnalysisActivity[], today = MONDAY) {
 const weekday = (d: string) => new Date(`${d}T00:00:00Z`).getUTCDay()
 const runDays = (p: { days: PlanDay[] }) => p.days.filter(d => d.runMin > 0)
 const labels = (p: WeekPlan) => p.calc.map(c => c.label)
+const ctx = (start: string, over: Partial<LayoutContext> = {}): LayoutContext => ({
+  start,
+  maxRunMin: 999,
+  strict: false,
+  ranYesterday: false,
+  ranDayBefore: true,
+  stridesOk: false,
+  pace: PACE,
+  ...over,
+})
+const idx = (days: PlanDay[]) => days.flatMap((d, i) => (d.runMin > 0 ? [i] : []))
+const backToBack = (days: PlanDay[]) =>
+  days.some((d, i) => i > 0 && d.runMin > 0 && days[i - 1].runMin > 0)
 
 describe('rule 1: HR cap', () => {
   it('caps every run at 156 and plans only easy / long / rest days', () => {
@@ -122,17 +135,9 @@ describe('rule 4: projected load ratio ≤ 1.3', () => {
     const p = plan(spike())
     expect(p.trimmed).toBe(true)
     expect(p.projectedAcwr!).toBeLessThanOrEqual(1.3)
-    expect(p.totalRunMin).toBeLessThan(305)
+    expect(p.totalRunMin).toBeLessThan(220)
     expect(p.tags).toContain('Trimmed for load')
     expect(p.calc.some(c => c.kind === 'warn' && c.label.startsWith('Trimmed'))).toBe(true)
-  })
-
-  it('shortens easy runs first: the long run keeps its unscaled length unless the 30% cap binds', () => {
-    const p = plan(spike())
-    const long = p.days.find(d => d.type === 'long')!
-    const lastLong = 280 / 3
-    const unscaledLong = Math.floor(Math.min(0.3 * 305, lastLong + 10) / 5) * 5 // 90
-    expect(long.runMin).toBe(Math.min(unscaledLong, Math.floor((0.3 * p.totalRunMin) / 5) * 5))
   })
 
   it('still builds exactly +10% when the ratio is below 0.8', () => {
@@ -145,17 +150,34 @@ describe('rule 4: projected load ratio ≤ 1.3', () => {
   })
 })
 
-describe('rule 5: long run', () => {
-  it('is ≤ 30% of the week and ≤ last long run + 10', () => {
-    const history = [
-      ...weeks(addDaysToKey(MONDAY, -7), [...Array(16).fill(200), 140]),
-      // last week: 5 × 42 min, so the last long run is 42
-      ...[0, 1, 2, 4, 5].map(off => run(addDaysToKey(MONDAY, -7 + off), 42)),
-    ]
-    const p = plan(history)
+describe('rule 5: long run and the single-run cap', () => {
+  it('makes the long run ≤ 30% of the week', () => {
+    const p = plan(hist([110, 150]))
     const long = p.days.find(d => d.type === 'long')!
-    expect(long.runMin).toBe(50) // min(0.3 × 230, 42 + 10) → 52 → 50
+    expect(long.runMin).toBe(45) // 0.3 × 165 = 49.5 → 45
     expect(long.runMin).toBeLessThanOrEqual(0.3 * p.totalRunMin)
+  })
+
+  it('never plans a run over 110% of the longest in the last 30 days', () => {
+    // 6 weeks of 5 × 30 min, then a long layout would want 0.3 × 165 = 45.
+    const history = Array.from({ length: 42 }, (_, i) => addDaysToKey(MONDAY, -42 + i))
+      .filter(d => ![0, 5].includes(weekday(d)))
+      .map(d => run(d, 30))
+    const p = plan([...weeks(addDaysToKey(MONDAY, -42), Array(12).fill(150)), ...history])
+    expect(p.maxRunMin).toBe(35) // max(1.1 × 30, 30 + 5)
+    for (const d of p.days) expect(d.runMin).toBeLessThanOrEqual(35)
+  })
+
+  it('drops minutes the cap cannot place, and says so', () => {
+    const days = layoutWeek(200, ctx(MONDAY, { maxRunMin: 30 }))
+    expect(runDays({ days }).map(d => d.runMin)).toEqual([30, 30, 30, 30, 30])
+    expect(days.some(d => d.type === 'long')).toBe(false) // no longer than the rest
+    // 5 weeks off → nothing in the last 30 days → runs restart at 30 min.
+    const p = plan(hist([0, 0, 0, 0, 0], 300))
+    expect(p.maxRunMin).toBe(30)
+    expect(p.totalRunMin).toBe(120) // 150 wanted, 4 alternate days × 30
+    expect(p.calc.some(c => c.kind === 'warn' && c.label.startsWith('No run over 30 min'))).toBe(true)
+    expect(p.calc.at(-1)).toMatchObject({ label: 'This week', minutes: 120, kind: 'result' })
   })
 })
 
@@ -166,6 +188,7 @@ describe('rule 6: minimum week', () => {
     expect(p.tags).toContain('Minimum week')
     expect(runDays(p).map(d => d.runMin)).toEqual([30, 30, 30])
     expect(runDays(p).map(d => weekday(d.date))).toEqual([2, 4, 6])
+    expect(backToBack(p.days)).toBe(false)
     expect(p.days.filter(d => d.strength)).toHaveLength(1)
     expect(labels(p)).toContain('Below the 90-min minimum → minimum week')
   })
@@ -195,9 +218,10 @@ describe('rule 7: return from a layoff', () => {
     const today = addDaysToKey(restart, 7 * w)
     const back = Array.from({ length: w * 7 }, (_, i) => addDaysToKey(restart, i))
       .filter((_, i) => i % 2 === 0)
-      .map(d => run(d, 30))
+      .map(d => run(d, 25))
     const p = plan([...preGap, ...back], today)
-    expect(p.phase).toMatchObject({ kind: 'return', step })
+    expect(p.phase).toMatchObject({ kind: 'return', step, held: false })
+    expect(backToBack(p.days)).toBe(false) // returning runners run on alternate days
     if (p.phase.kind === 'return') expect(p.phase.preGapWeekMin).toBeCloseTo(200)
     expect(p.tags).toContain(`Return week ${step} of 4`)
     expect(labels(p)).toContain(`Return week ${step} of 4 · ${math}`)
@@ -214,6 +238,16 @@ describe('rule 7: return from a layoff', () => {
     expect(plan([...preGap, ...back], today).phase.kind).toBe('build')
   })
 
+  it('repeats a step when last week ran well over it', () => {
+    // Week 1 back should be 100 min; 4 × 50 = 200 were run instead.
+    const back = [0, 2, 4, 6].map(off => run(addDaysToKey(restart, off), 50))
+    const p = plan([...preGap, ...back], addDaysToKey(restart, 7))
+    expect(p.phase).toMatchObject({ kind: 'return', step: 1, held: true })
+    expect(p.tags).toContain('Return week 1 of 4 (repeated)')
+    expect(p.totalRunMin).toBe(100)
+    expect(labels(p)).toContain('Last week ran over its 100-min step → repeat it')
+  })
+
   it('never goes below the minimum week', () => {
     const small = weeks(addDaysToKey(gapStart, 2), [80, 80, 80, 80])
     const p = plan(small, restart)
@@ -224,14 +258,15 @@ describe('rule 7: return from a layoff', () => {
 })
 
 describe('rule 8: strides', () => {
-  it('adds strides only after 12 gap-free weeks, never on a Friday', () => {
+  it('adds strides only after 12 gap-free weeks, never the day before a long run', () => {
     const vols = Array(13).fill(140)
     vols[9] = 100 // keep the build count low so the week isn't a cutback
     const p = plan(weeks(MONDAY, vols))
     const strides = p.days.filter(d => d.strides)
     expect(strides).toHaveLength(1)
     expect(strides[0].type).toBe('easy')
-    expect(weekday(strides[0].date)).not.toBe(5)
+    const next = p.days[p.days.indexOf(strides[0]) + 1]
+    expect(next?.type).not.toBe('long')
   })
 
   it('has no strides with under 12 weeks of history', () => {
@@ -241,20 +276,11 @@ describe('rule 8: strides', () => {
 })
 
 describe('choosing the days', () => {
-  const ctx = (start: string, over: Partial<LayoutContext> = {}): LayoutContext => ({
-    start,
-    longCap: 999,
-    lastLong: 999,
-    movedLong: false,
-    stridesOk: false,
-    pace: PACE,
-    ...over,
-  })
   const starts = Array.from({ length: 7 }, (_, i) => addDaysToKey(MONDAY, i))
 
-  it('picks 3 / 4 / 5 / 6 runs at 120, 180 and 260 min', () => {
+  it('picks 3 / 4 / 5 runs at 120 and 180 min, and never more than 5', () => {
     expect([90, 115, 119, 120, 179, 180, 259, 260, 400].map(runsPerWeek)).toEqual([
-      3, 3, 3, 4, 4, 5, 5, 6, 6,
+      3, 3, 3, 4, 4, 5, 5, 5, 5,
     ])
   })
 
@@ -263,60 +289,156 @@ describe('choosing the days', () => {
       const days = layoutWeek(total, ctx(start))
       const runs = runDays({ days })
       expect(runs).toHaveLength(runsPerWeek(total))
-      expect(runs.reduce((s, d) => s + d.runMin, 0)).toBeLessThanOrEqual(total)
+      expect(runs.reduce((s, d) => s + d.runMin, 0)).toBe(total)
       for (const d of runs) {
         expect(d.runMin % 5).toBe(0)
         expect(d.runMin).toBeGreaterThanOrEqual(20)
       }
-      for (const d of days) {
-        if (weekday(d.date) === 0) expect(d.runMin).toBe(0) // Sunday never runs
-        if (d.type === 'long') expect(weekday(d.date)).toBe(6)
+      days.forEach((d, i) => {
+        if (d.type !== 'long') return
+        expect([0, 6]).toContain(weekday(d.date)) // long runs sit on the weekend
+        expect(days[i + 1]?.runMin ?? 0).toBe(0) // …with a rest day after
+        expect(d.runMin).toBe(Math.max(...runs.map(r => r.runMin)))
+      })
+      // Up to 4 runs fit on alternate days; 5 need pairs but never 3 in a row.
+      if (runs.length <= 4 && weekday(start) !== 0) expect(backToBack(days)).toBe(false)
+      expect(days.some((d, i) => i > 1 && d.runMin && days[i - 1].runMin && days[i - 2].runMin)).toBe(false)
+      // strength: up to twice, ≥ 48 h apart, with an easy run, never before the long run
+      const strength = days.flatMap((d, i) => (d.strength ? [i] : []))
+      expect(strength.length).toBeGreaterThanOrEqual(1)
+      expect(strength.length).toBeLessThanOrEqual(2)
+      if (strength.length === 2) expect(strength[1] - strength[0]).toBeGreaterThanOrEqual(2)
+      for (const i of strength) {
+        expect(days[i].type).toBe('easy')
+        expect(days[i + 1]?.type).not.toBe('long')
       }
-      // strength: twice, ≥ 48 h apart, never Friday or Sunday
-      const strength = days.filter(d => d.strength)
-      expect(strength).toHaveLength(2)
-      const gap = (Date.parse(strength[1].date) - Date.parse(strength[0].date)) / 86_400_000
-      expect(gap).toBeGreaterThanOrEqual(2)
-      for (const d of strength) expect([0, 5]).not.toContain(weekday(d.date))
-      expect(days.filter(d => d.runMin === 0 && !d.strength).length).toBeGreaterThanOrEqual(1)
     }
   })
 
-  it('makes 3-run weeks three equal easy runs with no long run', () => {
-    const days = layoutWeek(105, ctx(MONDAY))
-    expect(runDays({ days }).map(d => [d.type, d.runMin])).toEqual([
-      ['easy', 35],
-      ['easy', 35],
-      ['easy', 35],
-    ])
+  it('keeps a 3-run week on Tue / Thu / Sat, equal easy runs with no long run', () => {
+    for (const start of starts) {
+      const days = layoutWeek(105, ctx(start))
+      expect(runDays({ days }).map(d => [weekday(d.date), d.type, d.runMin]).sort()).toEqual([
+        [2, 'easy', 35],
+        [4, 'easy', 35],
+        [6, 'easy', 35],
+      ])
+    }
   })
 
-  it('combines strength with an easy run on the same day', () => {
-    const days = layoutWeek(140, ctx(MONDAY))
-    expect(days.filter(d => d.strength).every(d => d.type === 'easy' && d.runMin > 0)).toBe(true)
+  it('never runs the day after a real run when strict', () => {
+    for (const start of starts) {
+      for (const total of [105, 140, 200]) {
+        const days = layoutWeek(total, ctx(start, { strict: true, ranYesterday: true }))
+        expect(days[0].runMin).toBe(0)
+        expect(backToBack(days)).toBe(false)
+        expect(runDays({ days })).toHaveLength(3) // only days 1, 3, 5 are left
+      }
+    }
   })
 
-  it('makes Friday the shortest easy run in a 6-run week', () => {
-    const days = layoutWeek(305, ctx(MONDAY, { longCap: 60, lastLong: 60 }))
+  it('fits 4 strict runs only on alternate days from day 1', () => {
+    expect(idx(layoutWeek(140, ctx(MONDAY, { strict: true })))).toEqual([0, 2, 4, 6])
+  })
+
+  it('gives the 5-min leftovers to the earliest easy days, never the one before the long run', () => {
+    // Fri is the day before Saturday's long run in this 5-run week.
+    const days = layoutWeek(215, ctx(addDaysToKey(MONDAY, 1)))
+    const long = days.findIndex(d => d.type === 'long')
     const easy = days.filter(d => d.type === 'easy')
-    const friday = easy.find(d => weekday(d.date) === 5)!
-    expect(friday.runMin).toBe(Math.min(...easy.map(d => d.runMin)))
+    expect(days[long - 1].runMin).toBe(Math.min(...easy.map(d => d.runMin)))
   })
 
-  it('moves a missed Saturday long run to Sunday, rests Monday, keeps next Saturday the same', () => {
+  it('keeps forced rest days free and marks them', () => {
+    const days = layoutWeek(140, ctx(MONDAY, { strict: true, forcedRest: new Set([0, 1]) }))
+    expect(idx(days)).toEqual([2, 4, 6])
+    expect(days.map(d => d.loadRest)).toEqual([true, true, false, false, false, false, false])
+  })
+
+  it('makes Sunday the long run when Saturday was missed, and next Saturday too', () => {
     const sunday = addDaysToKey(MONDAY, 6)
-    // Ran Mon–Fri last week (no Saturday): the plan on Sunday moves the long run.
+    // Ran Mon / Wed / Fri last week (no Saturday).
     const history = [
       ...weeks(addDaysToKey(MONDAY, -1), [...Array(16).fill(150), 110]),
-      ...[0, 1, 2, 3, 4].map(off => run(addDaysToKey(MONDAY, off), 30)),
+      ...[0, 2, 4].map(off => run(addDaysToKey(MONDAY, off), 50)),
     ]
     const p = plan(history, sunday)
     expect(p.days[0].type).toBe('long')
-    expect(p.days[0].movedLong).toBe(true)
     expect(p.days[1].runMin).toBe(0)
     const saturday = p.days.find(d => weekday(d.date) === 6)!
     expect(saturday.type).toBe('long')
     expect(saturday.runMin).toBe(p.days[0].runMin)
+  })
+})
+
+describe('load ratio steers the week', () => {
+  // 16 steady weeks, a layoff, then a return run far over the ladder.
+  const ratioToday = (history: AnalysisActivity[], today = MONDAY) =>
+    acuteChronicRatio(fitnessFatigue(history, PROFILE, 7, new Date(`${today}T12:00:00Z`)))!
+
+  it('reports the same ratio as the load-ratio card', () => {
+    const history = hist([0, 0, 0, 0, 150, 330])
+    expect(plan(history).currentAcwr).toBeCloseTo(ratioToday(history))
+    const ranToday = [...history, run(MONDAY, 30)]
+    expect(plan(ranToday).currentAcwr).toBeCloseTo(ratioToday(ranToday))
+  })
+
+  it('rests while the ratio is ≥ 1.5, then runs on alternate days', () => {
+    const p = plan(hist([0, 0, 0, 0, 150, 330]))
+    expect(p.currentAcwr!).toBeGreaterThanOrEqual(1.5)
+    expect(p.loadState).toBe('high')
+    expect(p.days[0]).toMatchObject({ runMin: 0, loadRest: true })
+    expect(p.days.filter(d => d.loadRest).length).toBeGreaterThanOrEqual(1)
+    expect(p.spaced).toBe(true)
+    expect(backToBack(p.days)).toBe(false)
+    expect(p.days.some(d => d.strides)).toBe(false)
+    expect(labels(p)).toContain('Load ratio today')
+    expect(labels(p)).toContain('Rest while the load ratio is ≥ 1.5')
+    expect(p.calc.at(-1)!.kind).toBe('result')
+    expect(p.calc.at(-1)!.minutes).toBe(p.totalRunMin)
+  })
+
+  it('lets the week drop to 3 × 20 and caps runs at the recent longest in the overreach zone', () => {
+    const p = plan(hist([0, 0, 0, 0, 0, 0, 200, 400]))
+    expect(p.loadState).toBe('high')
+    expect(p.totalRunMin).toBeLessThan(90)
+    expect(p.totalRunMin).toBeGreaterThanOrEqual(40)
+    expect(p.maxRunMin).toBe(130) // longest in 30 days is 400 / 3, no +10%
+  })
+
+  it('holds instead of building, on alternate days, when the ratio is above 1.3', () => {
+    // A layoff long enough ago that the ladder is done, then a big jump.
+    const history = hist([0, 0, 75, 110, 135, 150, 150, 260])
+    const p = plan(history)
+    expect(p.phase.kind).toBe('build')
+    expect(p.loadState).toBe('elevated')
+    expect(p.totalRunMin).toBeLessThanOrEqual(p.lastWeekRunMin)
+    expect(p.spaced).toBe(true)
+    expect(backToBack(p.days)).toBe(false)
+    expect(p.days.some(d => d.loadRest)).toBe(false)
+  })
+
+  it('leaves a normal week alone', () => {
+    const p = plan(hist([110, 150]))
+    expect(p.loadState).toBe('ok')
+    expect(p.spaced).toBe(false)
+    expect(p.days.some(d => d.loadRest)).toBe(false)
+  })
+
+  it('does not steer by the ratio in the first 12 weeks of history', () => {
+    const p = plan(weeks(MONDAY, [60, 60, 60, 60, 60, 60, 300]))
+    expect(p.currentAcwr!).toBeGreaterThan(1.5)
+    expect(p.loadState).toBeNull()
+    expect(p.days.some(d => d.loadRest)).toBe(false)
+  })
+})
+
+describe('build cap', () => {
+  it('never builds past 130% of the 4-week average', () => {
+    const p = plan(hist([110, 280]))
+    // +10% × 280 = 308, but the 4-week average is (150 + 150 + 110 + 280) / 4.
+    expect(labels(p)).toContain('Capped · 130% × 173 (4-week average)')
+    expect(p.totalRunMin).toBeLessThanOrEqual(1.3 * 172.5)
   })
 })
 
