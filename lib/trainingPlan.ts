@@ -62,6 +62,8 @@ export interface PlanDay {
   strength: boolean
   strides: boolean
   loadRest: boolean // resting because the load ratio is ≥ 1.5 that day
+  loadCut: boolean // shortened so the run doesn't push the ratio to 1.5
+  loadRatio: number | null // projected ATL / CTL at the end of the day
 }
 
 /** One line of the working shown under "How this was set". */
@@ -173,6 +175,8 @@ function makeDay(date: string, runMin: number, pace: number | null): PlanDay {
     strength: false,
     strides: false,
     loadRest: false,
+    loadCut: false,
+    loadRatio: null,
   }
 }
 
@@ -335,8 +339,10 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
   })
 
   // Load at the end of the day before the plan, then projected forward one
-  // day at a time. `rest[i]` is what the load-ratio card would show on day i
-  // if that day were a rest day; `end` is the ratio after all 7 days.
+  // day at a time, each planned run adding its own load. `rest[i]` is what
+  // the load-ratio card would show on day i if that day were a rest day,
+  // `after[i]` what it would show once the day's plan is done, and `end` the
+  // ratio after all 7 days.
   const basePoint = fitnessFatigue(
     historyActs,
     profile,
@@ -361,13 +367,15 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
   const project = (days: PlanDay[]) => {
     let { ctl, atl } = base
     const rest: (number | null)[] = []
+    const after: (number | null)[] = []
     for (const d of days) {
       rest.push(ratioOf(ctl - ctl / 42, atl - atl / 7))
       const load = d.runMin > 0 ? plannedLoad(d) : 0
       ctl += (load - ctl) / 42
       atl += (load - atl) / 7
+      after.push(ratioOf(ctl, atl))
     }
-    return { rest, end: ratioOf(ctl, atl) }
+    return { rest, after, end: ratioOf(ctl, atl) }
   }
 
   const firstDay = history[0] ? history.reduce((m, r) => (r.day < m ? r.day : m), history[0].day) : null
@@ -414,19 +422,46 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
   })
 
   /**
-   * Lay the week out, then walk it day by day: a run on a day whose ratio
-   * would still be ≥ 1.5 becomes a rest day and the week is laid out again.
+   * Lay the week out, then walk it day by day with the load each earlier
+   * planned run adds:
+   *  - a run on a day whose ratio would still be ≥ 1.5 becomes a rest day
+   *    (as many in a row as it takes) and the week is laid out again
+   *  - while today's ratio is above 1.3, a run that would itself lift the
+   *    ratio to 1.5 is shortened, down to 20 min at the least
    */
   const solve = (weekMin: number, ctx: LayoutContext) => {
     const forcedRest = new Set<number>()
+    const caps = new Map<number, number>()
+    const setMin = (d: PlanDay, runMin: number): PlanDay => ({
+      ...d,
+      runMin,
+      distanceKm: pace ? runMin / pace : null,
+      loadCut: true,
+    })
     for (;;) {
-      const days = layoutWeek(weekMin, { ...ctx, forcedRest })
-      const { rest, end } = project(days)
-      const hot = loadState
-        ? days.findIndex((d, i) => d.runMin > 0 && rest[i] != null && rest[i]! >= REST_ACWR)
+      const days = layoutWeek(weekMin, { ...ctx, forcedRest }).map((d, i) =>
+        d.runMin > (caps.get(i) ?? Infinity) ? setMin(d, caps.get(i)!) : d,
+      )
+      const { rest, after, end } = project(days)
+      if (!loadState) return { days, end }
+      const over = (r: number | null) => r != null && r >= REST_ACWR
+
+      const hot = days.findIndex((d, i) => d.runMin > 0 && over(rest[i]))
+      const steep = loadUp
+        ? days.findIndex((d, i) => d.runMin > MIN_RUN_MIN && !caps.has(i) && over(after[i]))
         : -1
-      if (hot < 0) return { days, end }
-      forcedRest.add(hot)
+      if (hot >= 0 && (steep < 0 || hot < steep)) {
+        forcedRest.add(hot)
+        caps.clear() // the days are chosen again, so the cuts are worked out again
+      } else if (steep >= 0) {
+        let min = days[steep].runMin - 5
+        const fits = (m: number) =>
+          !over(project(days.map((d, i) => (i === steep ? setMin(d, m) : d))).after[steep])
+        while (min > MIN_RUN_MIN && !fits(min)) min -= 5
+        caps.set(steep, min)
+      } else {
+        return { days, end }
+      }
     }
   }
 
@@ -436,7 +471,10 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
     extras: { minimumWeek?: boolean; trimmed?: boolean; spaced?: boolean; wanted?: number } = {},
   ): WeekPlan => {
     const total = totalMin(days)
+    const ratios = project(days).after
+    days = days.map((d, i) => ({ ...d, loadRatio: loadState ? ratios[i] : null }))
     const loadRest = days.filter(d => d.loadRest).length
+    const loadCut = days.filter(d => d.loadCut).length
     if (loadRest > 0) {
       calc.push({
         label: `Rest while the load ratio is ≥ ${REST_ACWR}`,
@@ -444,7 +482,14 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
         kind: 'warn',
       })
     }
-    if (extras.wanted != null && total < extras.wanted) {
+    if (loadCut > 0) {
+      calc.push({
+        label: `Shortened so a run doesn't lift the ratio to ${REST_ACWR}`,
+        text: `${loadCut} ${loadCut === 1 ? 'run' : 'runs'}`,
+        kind: 'warn',
+      })
+    }
+    if (extras.wanted != null && total < extras.wanted && loadCut === 0) {
       calc.push({
         label: `No run over ${maxRunMin} min · ${
           loadState === 'high' ? 'your longest in 30 days' : 'longest in 30 days + 10%'

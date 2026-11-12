@@ -30,17 +30,26 @@ function calcValue(line: CalcLine, unit: Unit) {
   })
 }
 
+/** Same bands as the Acute : Chronic Load card. */
+function ratioClass(ratio: number) {
+  if (ratio >= 1.5) return 'text-rose-600'
+  if (ratio > 1.3) return 'text-amber-600'
+  if (ratio < 0.8) return 'text-sky-600'
+  return 'text-emerald-600'
+}
+
 function DayRow({ day, unit }: { day: PlanDay; unit: Unit }) {
   const isRun = day.runMin > 0
   const long = day.type === 'long'
   const extras = [day.strength && '+ Strength', day.strides && '+ strides'].filter(Boolean)
   return (
-    <div className="grid grid-cols-[6.5rem_1fr_auto] gap-3 items-baseline py-2 border-t border-zinc-100 text-sm">
+    <div className="grid grid-cols-[6.5rem_1fr_auto_2.25rem] gap-3 items-baseline py-2 border-t border-zinc-100 text-sm">
       <span className="text-zinc-400 tabular-nums">{format(parseISO(day.date), 'EEE, MMM d')}</span>
       {isRun ? (
         <span className={`font-medium ${long ? 'text-blue-600' : 'text-emerald-600'}`}>
           {long && 'Long run '}
           {minutesWithDistance(day.runMin, day.distanceKm, unit, { estimated: true })}
+          {day.loadCut && <span className="font-normal text-amber-600"> · shortened for load</span>}
         </span>
       ) : (
         <span className="text-zinc-400">
@@ -48,6 +57,12 @@ function DayRow({ day, unit }: { day: PlanDay; unit: Unit }) {
         </span>
       )}
       <span className="text-xs text-violet-600 text-right">{extras.join(' ')}</span>
+      <span
+        className={`text-xs tabular-nums text-right ${day.loadRatio == null ? '' : ratioClass(day.loadRatio)}`}
+        title="Projected load ratio at the end of this day"
+      >
+        {day.loadRatio?.toFixed(2)}
+      </span>
     </div>
   )
 }
@@ -136,6 +151,8 @@ export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit:
       <p className="text-xs text-zinc-400 mt-3">
         All runs easy, HR ≤ {plan.hrCap}. Walk to stay under.
         {paceLabel && ` Distances use your recent easy pace (${paceLabel}).`}
+        {plan.loadState != null &&
+          ' The number on the right is the load ratio projected for the end of each day if you follow the plan.'}
       </p>
     </div>
   )

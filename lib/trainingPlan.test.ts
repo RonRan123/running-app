@@ -398,6 +398,45 @@ describe('load ratio steers the week', () => {
     expect(p.calc.at(-1)!.minutes).toBe(p.totalRunMin)
   })
 
+  it('rests several days in a row when one is not enough', () => {
+    const p = plan(hist([0, 0, 0, 0, 0, 0, 200, 400]))
+    expect(p.currentAcwr!).toBeGreaterThan(2)
+    const first = p.days.findIndex(d => d.runMin > 0)
+    expect(first).toBeGreaterThanOrEqual(3)
+    expect(p.days.slice(0, first).every(d => d.loadRest)).toBe(true)
+    // A day's ratio before running is the previous evening's with one more
+    // day of decay (÷ 7 acute, ÷ 42 chronic). The first run comes on the
+    // first day that is under 1.5.
+    const morning = (i: number) => (p.days[i - 1].loadRatio! * (6 / 7)) / (41 / 42)
+    expect(morning(first)).toBeLessThan(1.5)
+    expect(morning(first - 1)).toBeGreaterThanOrEqual(1.5)
+  })
+
+  it('projects each day from the runs planned before it', () => {
+    const p = plan(hist([0, 0, 0, 0, 150, 330]))
+    p.days.forEach((d, i) => {
+      if (i === 0) return
+      const prev = p.days[i - 1].loadRatio!
+      // Rest days decay the ratio; run days lift it above where rest would leave it.
+      if (d.runMin === 0) expect(d.loadRatio!).toBeLessThan(prev)
+      else expect(d.loadRatio!).toBeGreaterThan(prev * 0.878)
+    })
+    expect(p.days[6].loadRatio).toBeCloseTo(p.projectedAcwr!)
+  })
+
+  it('never lets a planned run lift the ratio to 1.5 while load is high', () => {
+    for (const v of [[0, 0, 0, 0, 150, 330], [0, 0, 0, 0, 0, 0, 200, 400], [0, 0, 0, 100, 300]]) {
+      for (const off of [0, 1, 2, 3]) {
+        const p = plan(hist(v), addDaysToKey(MONDAY, off))
+        if (p.loadState === 'ok') continue
+        for (const d of p.days) {
+          if (d.runMin > 20) expect(d.loadRatio!).toBeLessThan(1.5)
+          if (d.loadCut) expect(d.runMin).toBeGreaterThanOrEqual(20)
+        }
+      }
+    }
+  })
+
   it('lets the week drop to 3 × 20 and caps runs at the recent longest in the overreach zone', () => {
     const p = plan(hist([0, 0, 0, 0, 0, 0, 200, 400]))
     expect(p.loadState).toBe('high')

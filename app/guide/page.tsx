@@ -480,8 +480,10 @@ export default async function GuidePage() {
                 The plan also reads the <strong>Acute : Chronic Load</strong> ratio (once you have 12
                 weeks of history). At 1.5 or above, a day stays a rest day until the ratio drops back
                 under 1.5, no run is longer than your recent longest, and the minimum week shrinks to
-                three 20-minute runs. Above 1.3, runs are on alternate days and the week holds instead
-                of building. The week is also trimmed so the ratio projected for its last day stays at
+                three 20-minute runs. Above 1.3, runs are on alternate days, the week holds instead of
+                building, and a run that would itself lift the ratio to 1.5 is shortened. Each planned
+                run feeds into the projection for the days after it, and the number at the right of
+                each row is the ratio expected at the end of that day if you follow the plan. The week is also trimmed so the ratio projected for its last day stays at
                 or below 1.3.
               </p>
               <p>
