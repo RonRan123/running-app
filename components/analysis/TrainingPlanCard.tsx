@@ -3,7 +3,9 @@
 import { format, parseISO } from 'date-fns'
 import type { CalcLine, PlanDay, WeekPlan } from '@/lib/trainingPlan'
 import { KM_PER_MILE, formatPace, type Unit } from '@/lib/units'
+import type { CheckIn, Level, TagKey } from '@/lib/checkIn'
 import { HelpLink } from './ChartCard'
+import CheckInTags from './CheckInTags'
 
 function distance(km: number, unit: Unit) {
   return `${(unit === 'mi' ? km / KM_PER_MILE : km).toFixed(1)} ${unit}`
@@ -39,18 +41,33 @@ function DayRow({ day, unit }: { day: PlanDay; unit: Unit }) {
       <span className="text-zinc-400 tabular-nums">{format(parseISO(day.date), 'EEE, MMM d')}</span>
       {isRun ? (
         <span className={`font-medium ${long ? 'text-blue-600' : 'text-emerald-600'}`}>
-          {long && (day.movedLong ? 'Long run (moved from Sat) ' : 'Long run ')}
+          {long && 'Long run '}
           {minutesWithDistance(day.runMin, day.distanceKm, unit, { estimated: true })}
         </span>
       ) : (
-        <span className="text-zinc-400">Rest</span>
+        <span className="text-zinc-400">
+          Rest{day.restReason && <span className="text-amber-600"> · {day.restReason.toLowerCase()}</span>}
+        </span>
       )}
       <span className="text-xs text-violet-600 text-right">{extras.join(' ')}</span>
     </div>
   )
 }
 
-export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit: Unit }) {
+export default function TrainingPlanCard({
+  plan,
+  unit,
+  checkIn,
+  onTag,
+  saveFailed = false,
+}: {
+  plan: WeekPlan
+  unit: Unit
+  checkIn: CheckIn
+  /** Omitted for the demo, which sees the plan without the check-in tags. */
+  onTag?: (key: TagKey, level: Level) => void
+  saveFailed?: boolean
+}) {
   const paceLabel = plan.easyPaceMinPerKm == null ? null : formatPace(plan.easyPaceMinPerKm, unit)
 
   return (
@@ -68,6 +85,11 @@ export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit:
           ` · ${plan.changePct > 0 ? '+' : plan.changePct < 0 ? '−' : ''}${Math.abs(plan.changePct)}% vs last week`}
         {plan.tags.length > 0 && ` · ${plan.tags.join(' · ')}`}
       </p>
+
+      {onTag && <CheckInTags checkIn={checkIn} onTag={onTag} />}
+      {saveFailed && (
+        <p className="mt-2 text-xs text-rose-600">Couldn&apos;t save that change. Try again.</p>
+      )}
 
       <details className="group mt-2">
         <summary className="inline-flex items-center gap-1 text-xs text-zinc-500 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-zinc-700">
@@ -110,6 +132,7 @@ export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit:
       <p className="text-xs text-zinc-400 mt-3">
         All runs easy, HR ≤ {plan.hrCap}. Walk to stay under.
         {paceLabel && ` Distances use your recent easy pace (${paceLabel}).`}
+        {plan.maxRunKm != null && ` No run over ${distance(plan.maxRunKm, unit)} this week.`}
       </p>
     </div>
   )

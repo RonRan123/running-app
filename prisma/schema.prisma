@@ -74,6 +74,15 @@ model UserSettings {
   // "distance" (target = km). Both null = no goal set.
   weeklyGoalType   String?
   weeklyGoalTarget Float?
+
+  // Optional heart-rate overrides for zones and training load. Null = resting
+  // 60 bpm, max 220 − age (or the highest recorded max if that is higher).
+  restingHr Int?
+  maxHr     Int?
+
+  // How the runner feels, set from the tags beside the 7-day plan: see
+  // lib/checkIn.ts for the shape. Null = everything fine. Never expires.
+  checkIn Json?
 }
 
 model RaceGoal {

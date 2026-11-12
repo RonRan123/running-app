@@ -1,42 +1,44 @@
-import {
-  acuteChronicRatio,
-  fitnessFatigue,
-  withoutExcluded,
-  type AnalysisActivity,
-  type HrProfile,
-} from '@/lib/analysis'
+import { withoutExcluded, type AnalysisActivity } from '@/lib/analysis'
 import { addDaysToKey, dayKeyInZone } from '@/lib/activitySummary'
+import { TAGS, defaultCheckIn, type CheckIn, type TagKey } from '@/lib/checkIn'
 
-// Rule-based 7-day plan for the Analysis page. Deterministic: the output
-// depends only on the input (no clock, no network), so the same history on
-// the same day always gives the same plan. Weeks are rolling 7-day blocks
-// aligned to the plan's first day; load projection reuses the app's own
-// TRIMP / CTL / ATL code via fitnessFatigue().
+// Rule-based 7-day base-building plan for the Analysis page. Deterministic:
+// the output depends only on the input (no clock, no network), so the same
+// history, check-in tags and day always give the same plan. Weeks are
+// rolling 7-day blocks aligned to the plan's first day.
+//
+// Every run is easy. The plan sets the week's minutes from recent weeks,
+// adjusts them for how the runner says they feel (the check-in tags), and
+// places the runs by spacing rules. Training load (TRIMP, the acute:chronic
+// ratio) plays no part: it is shown on its own cards only.
 
 export const HR_CAP = 156
-const MAX_ACWR = 1.3
 const MIN_WEEK_MIN = 90 // 3 × 30 min easy + 1 strength
 const MIN_WEEK_RUN_MIN = 30
 const MIN_RUN_MIN = 20
 const MIN_HISTORY_DAYS = 14
 const LAYOFF_REST_DAYS = 7 // full days without a run
 const BUILD_RATE = 1.1
-const CUTBACK_RATE = 0.75
-const CUTBACK_DETECT = 0.8 // a past week ≤ 80% of the one before counts as a cutback
+const BUILD_AVG_CAP = 1.3 // × the 4-week average: one big week can't compound
+const CUTBACK_RATE = 0.8
+const CUTBACK_DETECT = 0.9 // a past week ≤ 90% of the one before counts as a cutback
+const CUTBACK_RESUME = 0.7 // …and ≥ 70% of it was a planned one: resume from the peak
 const BUILD_WEEKS_BEFORE_CUTBACK = 3
+const BUILD_GROWTH = 1.05 // …and the last of them is ≥ 5% above two weeks earlier
 const RETURN_STEPS = [0.5, 0.75, 0.9, 1]
+const RETURN_OVERSHOOT = 1.2 // last week > 120% of its step → repeat the step
 const LONG_SHARE = 0.3
-const LONG_STEP_MIN = 10
-const DEFAULT_RUN_HR = 150
+const SINGLE_RUN_RATE = 1.1 // no run over 110% of the longest (by distance) in 30 days
+const SINGLE_RUN_DAYS = 30
 const RECENT_DAYS = 28
 const STRIDES_DAYS = 84 // 12 weeks
 const STRIDES_MAX_GAP = 7
 
 export interface PlanInput {
   activities: AnalysisActivity[] // full history; excluded IDs are removed here
-  profile: HrProfile
   today: string // yyyy-MM-dd in the user's time zone
   timeZone: string
+  checkIn?: CheckIn // how the runner feels; omitted = everything fine
 }
 
 export type DayType = 'easy' | 'long' | 'rest'
@@ -44,11 +46,11 @@ export type DayType = 'easy' | 'long' | 'rest'
 export interface PlanDay {
   date: string // yyyy-MM-dd
   type: DayType
-  runMin: number // 0 on rest days; multiple of 5
+  runMin: number // 0 on rest days
   distanceKm: number | null // ≈ runMin ÷ recent easy pace
   strength: boolean
   strides: boolean
-  movedLong: boolean // Sunday make-up for a missed Saturday long run
+  restReason: string | null // the check-in tag that makes this a rest day
 }
 
 /** One line of the working shown under "How this was set". */
@@ -64,9 +66,11 @@ export interface CalcLine {
 
 export type PlanPhase =
   | { kind: 'insufficient' }
-  | { kind: 'build'; week: number }
+  // `resumed`: the week after a cutback goes back to the level before it.
+  | { kind: 'build'; week: number; resumed: boolean }
   | { kind: 'cutback' }
-  | { kind: 'return'; step: 1 | 2 | 3 | 4; preGapWeekMin: number }
+  // `held`: last week ran well over its step, so that step repeats.
+  | { kind: 'return'; step: 1 | 2 | 3 | 4; preGapWeekMin: number; held: boolean }
 
 export interface WeekPlan {
   startDate: string
@@ -76,11 +80,13 @@ export interface WeekPlan {
   lastWeekRunMin: number
   lastWeekDistanceKm: number
   changePct: number | null // null when last week had no running
-  projectedAcwr: number | null // ATL / CTL at the end of day 7
+  spaced: boolean // no back-to-back run days this week
+  maxRunMin: number // longest single run allowed this week
+  maxRunKm: number | null // …as a distance at the recent easy pace
   phase: PlanPhase
   minimumWeek: boolean
-  trimmed: boolean // shortened to keep the projected ratio ≤ 1.3
-  flags: ('not-enough-data' | 'load-high')[]
+  adjusted: boolean // a check-in tag changed this week
+  flags: 'not-enough-data'[]
   tags: string[] // short header labels, e.g. "Return week 2 of 4"
   calc: CalcLine[]
   hrCap: number
@@ -91,25 +97,71 @@ interface Run {
   day: string
   min: number
   km: number
-  hr: number | null
 }
 
-type Slot = 'E' | 'ES' | 'L' | 'X' // easy, easy + strength, long, rest
+/**
+ * What one check-in tag at one level does to the week. With several tags
+ * set, the strictest value of each field applies.
+ */
+interface Effect {
+  restDays: number // rest days counted from the day the tag was set
+  weekShare: number | null // cap on the week, as a share of last week's minutes
+  spaced: boolean // alternate days only
+  noIncrease: boolean // no run longer than the recent longest
+  runCapMin: number | null // no run over this many minutes
+  note: string // shown under "How this was set"
+}
 
-// Weekday (0 = Sunday) → slot, by runs per week. Sunday is always rest /
-// cross-train, strength is 48 h apart and never the day before the long run,
-// and 3-run weeks have no long run (the 30% cap would make it the shortest).
-const TEMPLATES: Record<number, Slot[]> = {
-  //   Sun  Mon   Tue   Wed  Thu   Fri  Sat
-  3: ['X', 'X', 'ES', 'X', 'ES', 'X', 'E'],
-  4: ['X', 'X', 'ES', 'E', 'ES', 'X', 'L'],
-  5: ['X', 'E', 'ES', 'E', 'ES', 'X', 'L'],
-  6: ['X', 'ES', 'E', 'ES', 'E', 'E', 'L'],
+const SICK_REST_DAYS = Infinity
+const effect = (e: Partial<Effect> & { note: string }): Effect => ({
+  restDays: 0,
+  weekShare: null,
+  spaced: false,
+  noIncrease: false,
+  runCapMin: null,
+  ...e,
+})
+
+// Hold = no build this week (the week is capped at last week's minutes).
+export const EFFECTS: Record<TagKey, (Effect | null)[]> = {
+  pain: [
+    null,
+    effect({ weekShare: 1, spaced: true, runCapMin: 30, note: 'hold · alternate days · runs ≤ 30 min' }),
+    effect({
+      restDays: 2,
+      weekShare: 0.75,
+      spaced: true,
+      runCapMin: 30,
+      note: 'rest 2 days · 75% week · alternate days · runs ≤ 30 min',
+    }),
+  ],
+  soreness: [
+    null,
+    effect({ weekShare: 1, spaced: true, noIncrease: true, note: 'hold · alternate days · no longer runs' }),
+    effect({
+      restDays: 1,
+      weekShare: 0.75,
+      spaced: true,
+      noIncrease: true,
+      note: 'rest 1 day · 75% week · alternate days · no longer runs',
+    }),
+  ],
+  sleep: [
+    null,
+    effect({ weekShare: 1, note: 'hold' }),
+    effect({ weekShare: 1, spaced: true, note: 'hold · alternate days' }),
+  ],
+  tiredness: [
+    null,
+    effect({ weekShare: 1, note: 'hold' }),
+    effect({ restDays: 1, weekShare: 1, spaced: true, note: 'rest 1 day · hold · alternate days' }),
+  ],
+  sick: [null, effect({ restDays: SICK_REST_DAYS, note: 'rest until you turn this off' })],
 }
 
 const SUNDAY = 0
-const FRIDAY = 5
 const SATURDAY = 6
+const ANCHOR_DAYS = [2, 4, 6] // Tue / Thu / Sat: where a 3-run week prefers to sit
 
 const toUtc = (key: string) => new Date(`${key}T00:00:00Z`)
 const weekday = (key: string) => toUtc(key).getUTCDay()
@@ -118,11 +170,11 @@ const daysBetween = (from: string, to: string) =>
 // The epsilon keeps float noise (0.75 × 140 = 104.99999…) from dropping 5 min.
 const floor5 = (min: number) => Math.floor(min / 5 + 1e-9) * 5
 
+/** Runs per week by volume: a run day is added before runs get long. */
 export function runsPerWeek(weekMin: number) {
   if (weekMin < 120) return 3
   if (weekMin < 180) return 4
-  if (weekMin < 260) return 5
-  return 6
+  return 5
 }
 
 function sumIn(runs: Run[], from: string, to: string) {
@@ -145,9 +197,13 @@ function median(xs: number[]) {
 
 export interface LayoutContext {
   start: string
-  longCap: number // L0: long run at the unscaled target
-  lastLong: number
-  movedLong: boolean
+  maxRunMin: number // no single run longer than this
+  strict: boolean // back-to-back run days are not allowed at all
+  ranYesterday: boolean // a real run the day before `start`
+  ranDayBefore: boolean // …and two days before
+  forcedRest?: ReadonlyMap<number, string> // day index → why it must rest
+  runs?: number // run count override (the minimum week is always 3)
+  strength?: number // strength sessions, default 2
   stridesOk: boolean
   pace: number | null
 }
@@ -160,97 +216,151 @@ function makeDay(date: string, runMin: number, pace: number | null): PlanDay {
     distanceKm: runMin > 0 && pace ? runMin / pace : null,
     strength: false,
     strides: false,
-    movedLong: false,
+    restReason: null,
   }
 }
 
-/** Lay out `weekMin` run minutes over the 7 days from `ctx.start`. */
+/** All ways to pick `n` of the indexes 0…6, in lexicographic order. */
+function combos(n: number): number[][] {
+  const out: number[][] = []
+  const walk = (from: number, picked: number[]) => {
+    if (picked.length === n) return void out.push(picked)
+    for (let i = from; i <= 7 - (n - picked.length); i++) walk(i + 1, [...picked, i])
+  }
+  walk(0, [])
+  return out
+}
+
+/**
+ * Pick which `n` of the 7 days run, and which of them are long runs.
+ * Lowest cost wins (first in lexicographic order on a tie):
+ *  - back-to-back days: not allowed when `strict`, otherwise heavily
+ *    penalized, and a third day in a row penalized again
+ *  - a run the day after a long run is worse still; the day before, mildly
+ *  - weeks of 4+ runs want a long run, which sits on the weekend (Saturday
+ *    preferred) so it comes round about once a week
+ *  - 3-run weeks prefer Tue / Thu / Sat so the plan doesn't drift day to day
+ *  - otherwise runs are spread as evenly as possible, counting the last
+ *    real run before the plan and the start of the following week
+ */
+function chooseDays(n: number, dates: string[], ctx: LayoutContext) {
+  let best: { runs: number[]; longs: number[]; cost: number } | null = null
+  for (const runs of combos(n)) {
+    if (runs.some(i => ctx.forcedRest?.has(i))) continue
+    const ran = (i: number) =>
+      i === -1 ? ctx.ranYesterday : i === -2 ? ctx.ranDayBefore : runs.includes(i)
+
+    let cost = 0
+    let adjacent = false
+    for (const i of runs) {
+      if (!ran(i - 1)) continue
+      adjacent = true
+      cost += ran(i - 2) ? 200 : 100
+    }
+    if (adjacent && ctx.strict) continue
+
+    let longs: number[] = []
+    if (n >= 4) {
+      const weekend = runs.filter(i => [SATURDAY, SUNDAY].includes(weekday(dates[i])))
+      // A second long run only when it is the following weekend (Sun → Sat).
+      longs = weekend.filter((i, k) => k === 0 || i - weekend[0] >= 6)
+      if (longs.length === 0) cost += 10
+      else if (weekday(dates[longs[0]]) === SUNDAY) cost += 6
+      for (const l of longs) {
+        if (ran(l + 1)) cost += 150
+        if (ran(l - 1)) cost += ran(l - 2) ? 40 : 20
+      }
+    }
+    if (n === 3) cost += 5 * runs.filter(i => !ANCHOR_DAYS.includes(weekday(dates[i]))).length
+
+    const seq = [ctx.ranYesterday ? -1 : ctx.ranDayBefore ? -2 : -3, ...runs, 7]
+    for (let k = 1; k < seq.length; k++) cost += (seq[k] - seq[k - 1]) ** 2
+
+    if (!best || cost < best.cost) best = { runs, longs, cost }
+  }
+  return best
+}
+
+/**
+ * Lay out `weekMin` run minutes over the 7 days from `ctx.start`. The total
+ * comes out below `weekMin` when the spacing rules leave too few run days for
+ * the single-run cap to cover it; those minutes are dropped, never moved.
+ */
 export function layoutWeek(weekMin: number, ctx: LayoutContext): PlanDay[] {
   const dates = Array.from({ length: 7 }, (_, i) => addDaysToKey(ctx.start, i))
-  const slots = dates.map(d => TEMPLATES[runsPerWeek(weekMin)][weekday(d)])
-  if (ctx.movedLong) {
-    // Missed Saturday: today (Sunday) is the long run, Monday rests.
-    slots[0] = 'L'
-    slots[1] = 'X'
-  }
+  const rest = () =>
+    dates.map((d, i) => ({ ...makeDay(d, 0, ctx.pace), restReason: ctx.forcedRest?.get(i) ?? null }))
+  // The cap is in whole minutes, not rounded to 5, so a capped run is exactly
+  // at the limit.
+  const cap = Math.floor(ctx.maxRunMin)
 
-  const longCount = slots.filter(s => s === 'L').length
-  const longMin =
-    longCount > 0
-      ? Math.max(
-          MIN_RUN_MIN,
-          floor5(Math.min(ctx.longCap, LONG_SHARE * weekMin, ctx.lastLong + LONG_STEP_MIN)),
-        )
-      : 0
-  const easyMin = weekMin - longMin * longCount
+  const wanted = Math.min(ctx.runs ?? runsPerWeek(weekMin), Math.floor(weekMin / MIN_RUN_MIN))
+  for (let n = wanted; n >= 1; n--) {
+    const pick = chooseDays(n, dates, ctx)
+    if (!pick) continue
 
-  // Never plan an easy run under 20 min: drop easy days (plain ones first)
-  // until the remaining minutes cover them.
-  const easyCount = () => slots.filter(s => s === 'E' || s === 'ES').length
-  while (easyCount() > 0 && easyMin < MIN_RUN_MIN * easyCount()) {
-    const plain = slots.lastIndexOf('E')
-    slots[plain >= 0 ? plain : slots.lastIndexOf('ES')] = 'X'
-  }
+    // The long run is 30% of the week, within the single-run cap. If the cap
+    // leaves it no longer than an even split, the week has no long run.
+    const even = Math.min(cap, floor5(weekMin / n))
+    const longMin = Math.max(MIN_RUN_MIN, Math.min(floor5(LONG_SHARE * weekMin), cap))
+    const longs = longMin > even ? pick.longs : []
+    const easy = pick.runs.filter(i => !longs.includes(i))
+    if (easy.length === 0) continue
+    const easyMin = weekMin - longMin * longs.length
+    const base = Math.min(cap, floor5(easyMin / easy.length))
+    if (base < MIN_RUN_MIN) continue // never plan an easy run under 20 min
 
-  const n = easyCount()
-  const base = n > 0 ? floor5(easyMin / n) : 0
-  // Leftover 5-min chunks go to the earliest easy days, never Friday (the
-  // day before the long run).
-  let extra = n > 0 ? Math.floor((easyMin - base * n) / 5) : 0
-
-  const days = dates.map((date, i) => {
-    const slot = slots[i]
-    if (slot === 'X') return makeDay(date, 0, ctx.pace)
-    if (slot === 'L') {
-      return { ...makeDay(date, longMin, ctx.pace), type: 'long' as const, movedLong: i === 0 && ctx.movedLong }
+    // Leftover 5-min chunks go to the earliest easy days, never the day
+    // before a long run.
+    let extra = base + 5 <= cap ? Math.floor((easyMin - base * easy.length) / 5) : 0
+    const days = rest()
+    for (const i of longs) days[i] = { ...makeDay(dates[i], longMin, ctx.pace), type: 'long' }
+    const beforeLong = (i: number) => longs.includes(i + 1)
+    for (const i of easy) {
+      const bonus = extra > 0 && !beforeLong(i) ? 5 : 0
+      if (bonus) extra--
+      days[i] = makeDay(dates[i], base + bonus, ctx.pace)
     }
-    const bonus = extra > 0 && weekday(date) !== FRIDAY ? 5 : 0
-    if (bonus) extra--
-    return { ...makeDay(date, base + bonus, ctx.pace), strength: slot === 'ES' }
-  })
 
-  if (ctx.stridesOk) {
-    const target = days.find(d => d.type === 'easy' && weekday(d.date) !== FRIDAY)
-    if (target) target.strides = true
+    // Strength: on easy-run days, 48 h apart, never the day before a long run.
+    let lastStrength = -Infinity
+    let strength = ctx.strength ?? 2
+    for (const i of easy) {
+      if (strength === 0 || beforeLong(i) || i - lastStrength < 2) continue
+      days[i].strength = true
+      lastStrength = i
+      strength--
+    }
+
+    if (ctx.stridesOk) {
+      const target = easy.find(i => !beforeLong(i))
+      if (target != null) days[target].strides = true
+    }
+    return days
   }
-  return days
-}
-
-/** Rule 6: Tue / Thu / Sat easy 30 min, one strength session. */
-function minimumWeek(start: string, pace: number | null): PlanDay[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const date = addDaysToKey(start, i)
-    const wd = weekday(date)
-    const run = wd === 2 || wd === 4 || wd === SATURDAY
-    return { ...makeDay(date, run ? MIN_WEEK_RUN_MIN : 0, pace), strength: wd === 2 }
-  })
+  return rest()
 }
 
 const totalMin = (days: PlanDay[]) => days.reduce((s, d) => s + d.runMin, 0)
 
-export function planNextWeek({ activities, profile, today, timeZone }: PlanInput): WeekPlan {
+export function planNextWeek({ activities, today, timeZone, checkIn = defaultCheckIn() }: PlanInput): WeekPlan {
   const acts = withoutExcluded(activities).filter(a => a.duration > 0)
-  const dayOf = (a: AnalysisActivity) => dayKeyInZone(new Date(a.date), timeZone)
   const runs: Run[] = acts
-    .map(a => ({ day: dayOf(a), min: a.duration / 60, km: a.distance, hr: a.avgHeartRate }))
+    .map(a => ({ day: dayKeyInZone(new Date(a.date), timeZone), min: a.duration / 60, km: a.distance }))
     .filter(r => r.day <= today)
 
   // A run already logged today makes today history; the plan starts tomorrow.
   const start = runs.some(r => r.day === today) ? addDaysToKey(today, 1) : today
   const history = runs.filter(r => r.day < start)
-  const historyActs = acts.filter(a => dayOf(a) < start)
   const lastWeekFrom = addDaysToKey(start, -7)
   const lastWeekTo = addDaysToKey(start, -1)
   const block = (k: number) =>
     sumIn(history, addDaysToKey(start, -7 * k), addDaysToKey(start, -7 * k + 6))
   const lastWeek = block(1)
+  const lastMin = Math.round(lastWeek.min)
 
   const recent = history.filter(r => r.day >= addDaysToKey(start, -RECENT_DAYS))
   const pace = median(recent.filter(r => r.km > 0.5).map(r => r.min / r.km))
-  const recentHr = recent.filter(r => r.hr).map(r => r.hr!)
-  const runHr = recentHr.length
-    ? recentHr.reduce((s, h) => s + h, 0) / recentHr.length
-    : DEFAULT_RUN_HR
 
   const calc: CalcLine[] = []
   const flags: WeekPlan['flags'] = []
@@ -264,29 +374,98 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
     kind,
   })
 
-  const project = (days: PlanDay[]) => {
-    const synthetic: AnalysisActivity[] = days
-      .filter(d => d.runMin > 0)
-      .map(d => ({
-        id: `plan-${d.date}`,
-        name: 'Planned run',
-        date: `${d.date}T12:00:00`,
-        distance: d.distanceKm ?? 0,
-        duration: d.runMin * 60,
-        avgPace: null,
-        avgHeartRate: runHr,
-        maxHeartRate: null,
-      }))
-    const end = new Date(`${addDaysToKey(start, 6)}T12:00:00`)
-    return acuteChronicRatio(fitnessFatigue([...historyActs, ...synthetic], profile, 7, end))
+  // The check-in tags that are set, and the strictest of what they ask for.
+  const active = TAGS.flatMap(tag => {
+    const state = checkIn[tag.key]
+    const fx = EFFECTS[tag.key][state.level]
+    return fx && state.since ? [{ tag, state, fx }] : []
+  })
+  const adjusted = active.length > 0
+  const weekShare = active.reduce<number | null>(
+    (min, a) => (a.fx.weekShare == null ? min : Math.min(min ?? Infinity, a.fx.weekShare)),
+    null,
+  )
+  const noIncrease = active.some(a => a.fx.noIncrease)
+  const runCapMin = active.reduce<number | null>(
+    (min, a) => (a.fx.runCapMin == null ? min : Math.min(min ?? Infinity, a.fx.runCapMin)),
+    null,
+  )
+  // Rest days sit on fixed dates, counted from the day each tag was set.
+  const forcedRest = new Map<number, string>()
+  for (const { tag, state, fx } of active) {
+    for (let i = 0; i < 7; i++) {
+      const since = daysBetween(state.since!, addDaysToKey(start, i))
+      if (since >= 0 && since < fx.restDays && !forcedRest.has(i)) forcedRest.set(i, tag.label)
+    }
+  }
+  const checkInLines = () => {
+    for (const { tag, state, fx } of active) {
+      calc.push({
+        label: `${tag.label} · ${(tag.levels as readonly string[])[state.level].toLowerCase()}`,
+        text: fx.note,
+        kind: 'warn',
+      })
+    }
   }
 
+  // No single run over 110% of the longest (by distance) in the last 30
+  // days, turned into minutes at the recent easy pace. A sore-legs tag takes
+  // the 10% away; a pain tag caps runs outright.
+  const lately = history.filter(r => r.day >= addDaysToKey(start, -SINGLE_RUN_DAYS))
+  const rate = noIncrease ? 1 : SINGLE_RUN_RATE
+  const longestKm = Math.max(0, ...lately.map(r => r.km))
+  const longestMin = Math.max(0, ...lately.map(r => r.min))
+  const fromLongest = pace && longestKm > 0 ? rate * longestKm * pace : rate * longestMin
+  const maxRunMin = Math.min(
+    runCapMin ?? Infinity,
+    Math.max(MIN_WEEK_RUN_MIN, Math.floor(fromLongest + 1e-9)),
+  )
+
+  const runDays = [...new Set(history.map(r => r.day))].sort()
+  const layout = (strict: boolean, minimum: boolean): LayoutContext => ({
+    start,
+    maxRunMin,
+    strict,
+    ranYesterday: runDays.includes(addDaysToKey(start, -1)),
+    ranDayBefore: runDays.includes(addDaysToKey(start, -2)),
+    forcedRest,
+    stridesOk: !adjusted && stridesAllowed(runDays, start),
+    pace,
+    ...(minimum ? { runs: 3, strength: 1 } : {}),
+  })
+
   const finish = (
-    days: PlanDay[],
+    weekMin: number,
     phase: PlanPhase,
-    extras: { minimumWeek?: boolean; trimmed?: boolean } = {},
+    extras: { minimumWeek?: boolean; spaced?: boolean } = {},
   ): WeekPlan => {
+    const days = layoutWeek(weekMin, layout(extras.spaced ?? false, extras.minimumWeek ?? false))
     const total = totalMin(days)
+    if (adjusted) tags.push('Adjusted for check-in')
+    if (total < weekMin) {
+      const rests = days.filter(d => d.restReason).length
+      const capped = days.some(d => d.runMin === maxRunMin)
+      calc.push({
+        label:
+          rests > 0 && !capped
+            ? `${rests} rest ${rests === 1 ? 'day' : 'days'} from the check-in`
+            : `No run over ${maxRunMin} min · ${
+                runCapMin != null && maxRunMin === runCapMin
+                  ? 'check-in'
+                  : noIncrease
+                    ? 'your longest in 30 days'
+                    : 'longest in 30 days + 10%'
+              }`,
+        minutes: total - weekMin,
+        kind: 'warn',
+      })
+    }
+    // The last line is the result; anything after the last planned line
+    // gets a closing "This week".
+    const last = calc[calc.length - 1]
+    if (last.estimated && last.minutes === total) last.kind = 'result'
+    else calc.push(planned('This week', total, 'result'))
+
     const distances = days.filter(d => d.runMin > 0).map(d => d.distanceKm)
     return {
       startDate: start,
@@ -298,10 +477,12 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
       lastWeekRunMin: lastWeek.min,
       lastWeekDistanceKm: lastWeek.km,
       changePct: lastWeek.min > 0 ? Math.round((total / lastWeek.min - 1) * 100) : null,
-      projectedAcwr: project(days),
+      spaced: extras.spaced ?? false,
+      maxRunMin,
+      maxRunKm: estimate(maxRunMin),
       phase,
       minimumWeek: extras.minimumWeek ?? false,
-      trimmed: extras.trimmed ?? false,
+      adjusted,
       flags,
       tags,
       calc,
@@ -316,19 +497,19 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
     flags.push('not-enough-data')
     tags.push('Not enough data yet')
     calc.push({ label: 'Fewer than 14 days of runs', text: 'not enough data yet' })
-    calc.push(planned('Minimum week', MIN_WEEK_MIN, 'result'))
-    return finish(minimumWeek(start, pace), { kind: 'insufficient' }, { minimumWeek: true })
+    checkInLines()
+    calc.push(planned('Minimum week', MIN_WEEK_MIN))
+    return finish(MIN_WEEK_MIN, { kind: 'insufficient' }, { minimumWeek: true, spaced: true })
   }
 
   calc.push({
     label: `Last full week · ${rangeLabel(lastWeekFrom, lastWeekTo)}`,
-    minutes: Math.round(lastWeek.min),
+    minutes: lastMin,
     distanceKm: lastWeek.km,
   })
 
   // Most recent layoff: ≥ 7 full days without a run, between two runs or
   // between the last run and the plan's first day.
-  const runDays = [...new Set(history.map(r => r.day))].sort()
   const seq = [...runDays, start]
   let gapStart: string | null = null // last run before the gap
   let restart: string | null = null // first run after it (or the plan start)
@@ -344,14 +525,19 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
   let phase: PlanPhase
   const returnStep = restart ? Math.floor(daysBetween(restart, start) / 7) : Infinity
   if (gapStart && restart && returnStep < RETURN_STEPS.length) {
-    // Rule 7: 50 → 75 → 90 → 100% of the pre-gap average week.
+    // Rule 7: 50 → 75 → 90 → 100% of the pre-gap average week. A week run
+    // well over its step doesn't earn the next one: the step repeats.
     const preGap = sumIn(history, addDaysToKey(gapStart, -27), gapStart)
     const preGapMin = preGap.min / 4
-    const pct = RETURN_STEPS[returnStep]
-    const step = (returnStep + 1) as 1 | 2 | 3 | 4
+    const lastStepMin =
+      returnStep > 0 ? Math.max(MIN_WEEK_MIN, RETURN_STEPS[returnStep - 1] * preGapMin) : null
+    const held = lastStepMin != null && lastWeek.min > RETURN_OVERSHOOT * lastStepMin
+    const index = held ? returnStep - 1 : returnStep
+    const pct = RETURN_STEPS[index]
+    const step = (index + 1) as 1 | 2 | 3 | 4
     target = pct * preGapMin
-    phase = { kind: 'return', step, preGapWeekMin: preGapMin }
-    tags.push(`Return week ${step} of 4`)
+    phase = { kind: 'return', step, preGapWeekMin: preGapMin, held }
+    tags.push(`Return week ${step} of 4${held ? ' (repeated)' : ''}`)
     calc.push({
       label: `Gap · ${rangeLabel(addDaysToKey(gapStart, 1), addDaysToKey(restart, -1))}`,
       text: `${daysBetween(gapStart, restart) - 1} days off`,
@@ -362,115 +548,104 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
       perWeek: true,
       distanceKm: preGap.km / 4,
     })
+    if (held) {
+      calc.push({
+        label: `Last week ran over its ${Math.round(lastStepMin!)}-min step → repeat it`,
+        text: `${lastMin} min run`,
+        kind: 'warn',
+      })
+    }
     calc.push(
       planned(`Return week ${step} of 4 · ${pct * 100}% × ${Math.round(preGapMin)}`, Math.round(target)),
     )
   } else {
     // Rule 3: count consecutive build weeks since the last cutback / layoff.
-    let builds = 0
-    for (let k = 1; ; k++) {
-      const blockStart = addDaysToKey(start, -7 * k)
-      if (restart && blockStart < addDaysToKey(restart, 28)) break // still in the return ladder
-      if (blockStart < firstDay) break
-      if (block(k).min <= CUTBACK_DETECT * block(k + 1).min) break
-      builds++
+    const inLadder = (blockStart: string) => !!restart && blockStart < addDaysToKey(restart, 28)
+    const buildsBefore = (from: number) => {
+      let n = 0
+      for (let k = from; ; k++) {
+        const blockStart = addDaysToKey(start, -7 * k)
+        if (inLadder(blockStart)) break // still in the return ladder
+        if (blockStart < firstDay) break
+        if (block(k).min <= CUTBACK_DETECT * block(k + 1).min) break
+        n++
+      }
+      return n
     }
-    const lastMin = Math.round(lastWeek.min)
-    if (builds >= BUILD_WEEKS_BEFORE_CUTBACK) {
-      target = CUTBACK_RATE * lastWeek.min
+    const builds = buildsBefore(1)
+    // Steady weeks aren't builds: a cutback is only earned by weeks that grew.
+    const grew = (k: number) => block(k).min > BUILD_GROWTH * block(k + 2).min
+    const cutbackMin = CUTBACK_RATE * lastWeek.min
+    // Last week was the cutback after three builds (70–90% of the week
+    // before it): this week goes back to that earlier level, so a cutback
+    // never costs the progress made. A week that is short for any other
+    // reason is built on as it is; missed minutes are never made up.
+    const peak = block(2).min
+    const afterCutback =
+      builds === 0 &&
+      lastWeek.min <= CUTBACK_DETECT * peak &&
+      lastWeek.min >= CUTBACK_RESUME * peak &&
+      buildsBefore(2) >= BUILD_WEEKS_BEFORE_CUTBACK &&
+      grew(2)
+
+    if (builds >= BUILD_WEEKS_BEFORE_CUTBACK && grew(1) && cutbackMin >= MIN_WEEK_MIN) {
+      // An easier week after three weeks that grew; skipped while it would
+      // fall below the minimum week.
+      target = cutbackMin
       phase = { kind: 'cutback' }
       tags.push('Cutback week')
-      calc.push(planned(`${builds} build weeks in a row → cutback · 75% × ${lastMin}`, Math.round(target)))
+      calc.push(planned(`${builds} build weeks in a row → cutback · 80% × ${lastMin}`, Math.round(target)))
     } else {
-      // Rule 2 (also when the ratio is below 0.8 — no jumps).
-      target = BUILD_RATE * lastWeek.min
-      phase = { kind: 'build', week: builds + 1 }
-      calc.push(planned(`Build week ${builds + 1} · +10% × ${lastMin}`, Math.round(target)))
+      // Rule 2: +10% on last week (or back to the pre-cutback week), but
+      // never more than 130% of the 4-week average, so one oversized week
+      // isn't built on.
+      if (afterCutback) {
+        target = peak
+        phase = { kind: 'build', week: 1, resumed: true }
+        calc.push(planned('Back to the week before the cutback', Math.round(target)))
+      } else {
+        target = BUILD_RATE * lastWeek.min
+        phase = { kind: 'build', week: builds + 1, resumed: false }
+        calc.push(planned(`Build week ${builds + 1} · +10% × ${lastMin}`, Math.round(target)))
+      }
+      const blocks = [1, 2, 3, 4].filter(k => addDaysToKey(start, -7 * k + 6) >= firstDay)
+      const average = blocks.reduce((s, k) => s + block(k).min, 0) / blocks.length
+      if (target > BUILD_AVG_CAP * average) {
+        target = BUILD_AVG_CAP * average
+        calc.push(
+          planned(`Capped · 130% × ${Math.round(average)} (4-week average)`, Math.round(target)),
+        )
+      }
     }
   }
 
-  const rounded = floor5(target)
-  calc.push(planned('Rounded down to 5', rounded))
+  // Check-in: hold the week at last week's minutes, or cut it to 75% of them.
+  checkInLines()
+  if (weekShare != null && target > weekShare * lastWeek.min) {
+    target = weekShare * lastWeek.min
+    calc.push(
+      planned(
+        weekShare === 1 ? `Check-in → hold at last week's ${lastMin}` : `Check-in → ${weekShare * 100}% × ${lastMin}`,
+        Math.round(target),
+      ),
+    )
+  }
+
+  let weekMin = floor5(target)
+  calc.push(planned('Rounded down to 5', weekMin))
 
   // Rule 6: never below the minimum week.
-  if (rounded < MIN_WEEK_MIN) {
+  const minimum = weekMin < MIN_WEEK_MIN
+  if (minimum) {
+    weekMin = MIN_WEEK_MIN
     tags.push('Minimum week')
-    calc.push(planned('Below the 90-min minimum → minimum week', MIN_WEEK_MIN, 'result'))
-    const days = minimumWeek(start, pace)
-    const acwr = project(days)
-    if (acwr != null && acwr > MAX_ACWR) flagLoadHigh(acwr)
-    return finish(days, phase, { minimumWeek: true })
+    calc.push(planned(`Below the ${MIN_WEEK_MIN}-min minimum → minimum week`, MIN_WEEK_MIN))
   }
 
-  const lastLong = lastLongRun(history, start)
-  const ctx: LayoutContext = {
-    start,
-    longCap: floor5(Math.min(LONG_SHARE * rounded, lastLong + LONG_STEP_MIN)),
-    lastLong,
-    movedLong:
-      weekday(start) === SUNDAY &&
-      runsPerWeek(rounded) >= 4 &&
-      !history.some(r => r.day === addDaysToKey(start, -1)),
-    stridesOk: stridesAllowed(runDays, start),
-    pace,
-  }
-
-  // Rule 4: shrink 5 min at a time until the projected ratio is ≤ 1.3. The
-  // long run is pinned at its unscaled length, so easy runs shrink first.
-  const firstTry = layoutWeek(rounded, ctx)
-  const firstAcwr = project(firstTry)
-  if (firstAcwr == null || firstAcwr <= MAX_ACWR) {
-    calc[calc.length - 1].kind = 'result'
-    return finish(firstTry, phase)
-  }
-  for (let w = rounded - 5; w >= MIN_WEEK_MIN; w -= 5) {
-    const days = layoutWeek(w, ctx)
-    const acwr = project(days)
-    if (acwr == null || acwr <= MAX_ACWR) {
-      tags.push('Trimmed for load')
-      calc.push({
-        label: `Trimmed · load ratio would hit ${firstAcwr.toFixed(2)}`,
-        minutes: w - rounded,
-        kind: 'warn',
-      })
-      calc.push(planned('This week', totalMin(days), 'result'))
-      return finish(days, phase, { trimmed: true })
-    }
-  }
-
-  // Even 90 min of the normal layout is too much: fall back to the minimum week.
-  tags.push('Minimum week')
-  const days = minimumWeek(start, pace)
-  calc.push({
-    label: `Trimmed · load ratio would hit ${firstAcwr.toFixed(2)}`,
-    minutes: MIN_WEEK_MIN - rounded,
-    kind: 'warn',
-  })
-  calc.push(planned('Minimum week', MIN_WEEK_MIN, 'result'))
-  const acwr = project(days)
-  if (acwr != null && acwr > MAX_ACWR) flagLoadHigh(acwr)
-  return finish(days, phase, { minimumWeek: true, trimmed: true })
-
-  function flagLoadHigh(acwr: number) {
-    flags.push('load-high')
-    tags.push('Load high')
-    calc.push({
-      label: `Minimum week still projects ${acwr.toFixed(2)}`,
-      text: 'keep everything easy',
-      kind: 'warn',
-    })
-  }
-}
-
-/** Longest single run in the most recent 7-day block that has any run. */
-function lastLongRun(history: Run[], start: string) {
-  for (let k = 1; k <= 52; k++) {
-    const from = addDaysToKey(start, -7 * k)
-    const to = addDaysToKey(from, 6)
-    const inBlock = history.filter(r => r.day >= from && r.day <= to)
-    if (inBlock.length) return Math.max(...inBlock.map(r => r.min))
-  }
-  return MIN_WEEK_RUN_MIN
+  // Returning runners, and anyone a check-in tag says so for, run on
+  // alternate days only.
+  const spaced = phase.kind === 'return' || active.some(a => a.fx.spaced)
+  return finish(weekMin, phase, { minimumWeek: minimum, spaced })
 }
 
 /** Rule 8: 12 straight weeks with no gap over 7 days. */

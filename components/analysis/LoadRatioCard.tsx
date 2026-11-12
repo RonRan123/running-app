@@ -6,26 +6,26 @@ const BANDS = [
   {
     max: 0.8,
     classes: 'text-sky-700 bg-sky-50 border-sky-200',
-    label: 'Recovering / detraining',
-    detail: 'Recent load is well below your fitness — fine for a taper or recovery week.',
+    label: 'Easing off',
+    detail: 'This week is well below what you are used to. Fine for a recovery week.',
   },
   {
     max: 1.3,
     classes: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-    label: 'Sustainable build',
-    detail: 'Load is rising at a rate your body can absorb.',
+    label: 'Steady',
+    detail: 'This week is in line with your recent weeks.',
   },
   {
     max: 1.5,
     classes: 'text-amber-700 bg-amber-50 border-amber-200',
-    label: 'Pushing the limit',
-    detail: 'Load is climbing fast — consider an easy day soon.',
+    label: 'Ramping up',
+    detail: 'This week is noticeably heavier than your recent weeks.',
   },
   {
     max: Infinity,
     classes: 'text-rose-700 bg-rose-50 border-rose-200',
-    label: 'Overreach risk',
-    detail: 'Acute load far exceeds your base — injury risk zone. Rest recommended.',
+    label: 'Big jump',
+    detail: 'This week is far heavier than your recent weeks. Check how your legs feel.',
   },
 ]
 
@@ -39,7 +39,8 @@ export default function LoadRatioCard({ ratio }: { ratio: number | null }) {
         <HelpLink id="load-ratio" label="Acute : Chronic Load" />
       </h2>
       <p className="text-xs text-zinc-500 mt-0.5">
-        This week&apos;s load vs. your 6-week base. 0.8–1.3 is the validated safe-build window.
+        This week&apos;s load vs. your 6-week base: how fast you are ramping up. It describes
+        your training; it is not an injury predictor and does not change the plan.
       </p>
       {ratio === null || !band ? (
         <div className="flex-1 flex items-center justify-center text-sm text-zinc-400 py-8">

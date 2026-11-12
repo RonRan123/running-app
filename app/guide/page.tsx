@@ -445,6 +445,67 @@ export default async function GuidePage() {
             </Chart>
           </ChartGroup>
 
+          <ChartGroup title="This week (full history)">
+            <Chart id="training-plan" name="Next 7 days" want="follow it, keep it easy">
+              <p>
+                A suggested week of easy runs for building your base. It grows last week by about 10%
+                (never more than 130% of your 4-week average, so one big week isn’t built on). After
+                three weeks that grew it takes a cutback week at 80%, then goes back to the level
+                before the cutback and builds from there. After a break of a week or more it ramps
+                back in at 50 → 75 → 90 → 100% of what you were doing before; a return week run well
+                over its step repeats that step. It never drops below a minimum week of three
+                30-minute runs.
+              </p>
+              <p>
+                Run days are spread out, not fixed to weekdays: back-to-back days only appear in a
+                steady week of four or more runs, never while you are returning from a break, and the
+                long run sits on the weekend with a rest day after it. No single run is more than 10%
+                longer, in distance, than your longest run of the last 30 days.
+              </p>
+              <p>
+                <strong>How do you feel?</strong> The tags on the card adjust the week. Set one when
+                something changes; it stays until you change it back.
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>
+                  <strong>Pain</strong> (foot, shin, knee, tendon). Mild: no build, alternate days,
+                  runs of 30 minutes at most. Strong: two rest days from the day you set it, then a
+                  week at 75% of last week with the same limits.
+                </li>
+                <li>
+                  <strong>Leg soreness / tightness.</strong> Medium: no build, alternate days, no run
+                  longer than your recent longest. High: one rest day and a 75% week as well.
+                </li>
+                <li>
+                  <strong>Sleep.</strong> So-so: no build. Poor: no build, alternate days.
+                </li>
+                <li>
+                  <strong>Tiredness / stress.</strong> Medium: no build. High: one rest day, no build,
+                  alternate days.
+                </li>
+                <li>
+                  <strong>Sick.</strong> Rest every day until you turn it off.
+                </li>
+              </ul>
+              <p>
+                With several tags set, the strictest of each applies. Pain that stays strong after
+                the rest days is a reason to see a physio, not something the plan can fix.
+              </p>
+              <p>
+                Every run is easy, under your MAF heart rate; walk when you need to stay under it. Open{' '}
+                <strong>How this was set</strong> on the card to see the arithmetic.
+              </p>
+            </Chart>
+            <Chart id="base-building" name="Base building" want="bars and long run creeping up">
+              <p>
+                The two things the plan is trying to grow: minutes of easy running per week (at or
+                below your easy heart rate) and the length of your long run, over the last 8 weeks.
+                The streak counts weeks in a row with three or more runs, because a base is built by
+                showing up. Expect a dip every fourth week or so; that is the cutback.
+              </p>
+            </Chart>
+          </ChartGroup>
+
           <ChartGroup title="Load & readiness (full history)">
             <Chart id="fitness-fatigue" name="Fitness & Fatigue" want="fitness rising, fresh for races">
               <p>
@@ -454,24 +515,13 @@ export default async function GuidePage() {
                 for a race you want fitness high and form positive. That’s what a taper is for.
               </p>
             </Chart>
-            <Chart id="load-ratio" name="Acute : Chronic Load" want="0.8 – 1.3">
+            <Chart id="load-ratio" name="Acute : Chronic Load" want="context, not a target">
               <p>
-                This week’s load divided by your 6-week base: am I ramping up faster than my body can
-                absorb? 0.8–1.3 is a sustainable build. Above 1.3, ease off soon; above 1.5 is the zone
-                most linked to injury. Below 0.8 is recovery or taper, fine when it’s on purpose.
-              </p>
-            </Chart>
-            <Chart id="training-plan" name="Next 7 days" want="follow it, keep it easy">
-              <p>
-                A suggested week of easy runs built from your recent training. It grows last week by
-                about 10%, takes a cutback week (75%) after three builds in a row, and after a break of
-                a week or more ramps back in at 50 → 75 → 90 → 100% of what you were doing before. It is
-                trimmed so the projected load ratio stays at or below 1.3, and never drops below a
-                minimum week of three 30-minute runs.
-              </p>
-              <p>
-                Every run is easy, under your MAF heart rate; walk when you need to stay under it. Open{' '}
-                <strong>How this was set</strong> on the card to see the arithmetic.
+                This week’s load divided by your 6-week base: how fast am I ramping up? Around 1 means
+                this week looks like your recent weeks; well above 1 means a big jump. It describes
+                your training. Research in runners has not shown it predicts injury, so it does not
+                change the plan. How you feel does: see the check-in tags on{' '}
+                <strong>Next 7 days</strong>.
               </p>
             </Chart>
           </ChartGroup>
