@@ -131,7 +131,7 @@ export default async function RunDetailPage({
   // Zones as they were on the day of this run (age on that date).
   const zones = zonesOn(hrProfile(settings, analysisActivities), activity.date)
   const activityForTrimp = { ...activity, date: activity.date.toISOString(), avgPace: activity.avgPace, avgHeartRate: activity.avgHeartRate, maxHeartRate: activity.maxHeartRate, name: activity.name }
-  const runTrimp = activity.avgHeartRate ? trimp(activityForTrimp, zones.maxHr) : null
+  const runTrimp = activity.avgHeartRate ? trimp(activityForTrimp, zones.maxHr, settings?.restingHr ?? undefined) : null
 
   const splitsMi = streams ? computeSplits(streams, KM_PER_MILE * 1000) : []
   const splitsKm = streams ? computeSplits(streams, 1000) : []

@@ -40,8 +40,8 @@ export function withoutExcluded<T extends { id: string }>(activities: T[]): T[] 
   return activities.filter(a => !EXCLUDED_ACTIVITY_IDS.has(a.id))
 }
 
-// Assumed resting HR for TRIMP — not collected anywhere in the app.
-const REST_HR = 60
+// Resting HR for TRIMP unless one is set in Settings → Training.
+export const DEFAULT_REST_HR = 60
 // Fallback when no activity has a recorded max HR.
 const DEFAULT_MAX_HR = 190
 
@@ -78,6 +78,10 @@ export interface HrProfile {
   birthDate: string | null // yyyy-MM-dd
   age: number | null // legacy fixed age, used only without a birthDate
   recordedMax: number
+  // Overrides from Settings → Training; unset = 60 bpm resting, and a max of
+  // 220 − age (or the highest recorded max if that is higher).
+  restingHr?: number | null
+  maxHr?: number | null
 }
 
 /** Maffetone target HR: 180 − age. */
@@ -90,19 +94,25 @@ const EASY_SHARE = 0.78
 const ZONE2_SHARE = 0.65
 
 export function hrProfile(
-  settings: { birthDate?: Date | null; age?: number | null } | null | undefined,
+  settings:
+    | { birthDate?: Date | null; age?: number | null; restingHr?: number | null; maxHr?: number | null }
+    | null
+    | undefined,
   activities: Pick<AnalysisActivity, 'maxHeartRate'>[],
 ): HrProfile {
   return {
     birthDate: settings?.birthDate ? settings.birthDate.toISOString().slice(0, 10) : null,
     age: settings?.age ?? null,
     recordedMax: activities.reduce((max, a) => Math.max(max, a.maxHeartRate ?? 0), 0),
+    restingHr: settings?.restingHr ?? null,
+    maxHr: settings?.maxHr ?? null,
   }
 }
 
 /**
  * The profile with the birthday replaced by a fixed age as of `date`, for
  * pages the public demo can see: zones stay right, the birthday never ships.
+ * The owner's resting / max HR overrides are personal too and are dropped.
  */
 export function withoutBirthDate(profile: HrProfile, date: Date | string): HrProfile {
   return { birthDate: null, age: ageOn(profile, date), recordedMax: profile.recordedMax }
@@ -118,21 +128,26 @@ export function ageOn(profile: HrProfile, date: Date | string): number | null {
   return y - by - (beforeBirthday ? 1 : 0)
 }
 
-export function zonesForAge(age: number | null, recordedMax: number): HrZones {
+export function zonesForAge(
+  age: number | null,
+  recordedMax: number,
+  maxHrOverride?: number | null,
+): HrZones {
   if (age != null && age > 0) {
     const maf = mafTarget(age)
-    const predicted = 220 - age
+    // A max HR set in Settings replaces the age prediction, for "hard" too.
+    const predicted = maxHrOverride ?? 220 - age
     return {
       basis: 'age',
       age,
       maf,
-      maxHr: Math.max(predicted, recordedMax),
+      maxHr: maxHrOverride ?? Math.max(predicted, recordedMax),
       zone2Min: maf - 10,
       easyMax: maf,
       hardMin: Math.max(maf + 2, Math.round(predicted * HARD_SHARE)),
     }
   }
-  const maxHr = recordedMax > 120 ? recordedMax : DEFAULT_MAX_HR
+  const maxHr = maxHrOverride ?? (recordedMax > 120 ? recordedMax : DEFAULT_MAX_HR)
   return {
     basis: 'recorded',
     age: null,
@@ -146,7 +161,7 @@ export function zonesForAge(age: number | null, recordedMax: number): HrZones {
 
 /** Zones in force on a given date (e.g. a run's date). */
 export function zonesOn(profile: HrProfile, date: Date | string): HrZones {
-  return zonesForAge(ageOn(profile, date), profile.recordedMax)
+  return zonesForAge(ageOn(profile, date), profile.recordedMax, profile.maxHr)
 }
 
 export function classifyEffort(hr: number, zones: HrZones): Effort {
@@ -173,9 +188,9 @@ export function efficiencyFactor(a: AnalysisActivity) {
  * Banister TRIMP: duration-weighted training impulse from average HR.
  * trimp = minutes × HRr × 0.64 × e^(1.92 × HRr), HRr = fraction of HR reserve.
  */
-export function trimp(a: AnalysisActivity, maxHr: number) {
+export function trimp(a: AnalysisActivity, maxHr: number, restHr = DEFAULT_REST_HR) {
   if (!a.avgHeartRate) return 0
-  const hrr = Math.min(1, Math.max(0, (a.avgHeartRate - REST_HR) / (maxHr - REST_HR)))
+  const hrr = Math.min(1, Math.max(0, (a.avgHeartRate - restHr) / (maxHr - restHr)))
   return (a.duration / 60) * hrr * 0.64 * Math.exp(1.92 * hrr)
 }
 
@@ -209,7 +224,7 @@ export function fitnessFatigue(
     const day = startOfDay(new Date(a.date))
     if (day < firstDay) firstDay = day
     const key = format(day, 'yyyy-MM-dd')
-    dailyTrimp.set(key, (dailyTrimp.get(key) ?? 0) + trimp(a, zonesOn(profile, a.date).maxHr))
+    dailyTrimp.set(key, (dailyTrimp.get(key) ?? 0) + trimp(a, zonesOn(profile, a.date).maxHr, profile.restingHr ?? DEFAULT_REST_HR))
   }
 
   const totalDays = differenceInCalendarDays(lastDay, firstDay) + 1
@@ -356,4 +371,60 @@ export function longRunByWeek(activities: AnalysisActivity[], weeks = 16): Weekl
     result.push({ weekStart: key, distance: longest.get(key) ?? 0 })
   }
   return result
+}
+
+export interface BaseWeek {
+  weekStart: string // yyyy-MM-dd (Monday)
+  easyMin: number // minutes at or below the easy HR limit
+  totalMin: number
+  longKm: number // longest single run
+  runs: number
+}
+
+export interface BaseBuilding {
+  weeks: BaseWeek[] // trailing weeks, oldest first; the last one is in progress
+  streak: number // weeks in a row with 3+ runs, up to and including the last full week
+}
+
+/**
+ * The two things base building is trying to grow, week by week: minutes of
+ * easy running and the length of the long run. Plus the run of consistent
+ * weeks, because an aerobic base is built by showing up.
+ */
+export function baseBuilding(
+  activities: AnalysisActivity[],
+  profile: HrProfile,
+  weeks = 8,
+  now: Date = new Date(),
+): BaseBuilding {
+  const keyOf = (d: Date) => format(startOfWeek(d, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const easy = new Map(weeklyTimeInZones(activities, profile).map(w => [w.weekStart, w.easySec / 60]))
+  const byWeek = new Map<string, { totalMin: number; longKm: number; runs: number }>()
+  for (const a of activities) {
+    const key = keyOf(new Date(a.date))
+    const w = byWeek.get(key) ?? { totalMin: 0, longKm: 0, runs: 0 }
+    w.totalMin += a.duration / 60
+    w.longKm = Math.max(w.longKm, a.distance)
+    w.runs++
+    byWeek.set(key, w)
+  }
+
+  const thisWeek = startOfWeek(now, { weekStartsOn: 1 })
+  const week = (back: number): BaseWeek => {
+    const weekStart = format(addDays(thisWeek, -7 * back), 'yyyy-MM-dd')
+    const w = byWeek.get(weekStart)
+    return {
+      weekStart,
+      easyMin: easy.get(weekStart) ?? 0,
+      totalMin: w?.totalMin ?? 0,
+      longKm: w?.longKm ?? 0,
+      runs: w?.runs ?? 0,
+    }
+  }
+
+  let streak = 0
+  while (week(streak + 1).runs >= 3) streak++
+  if (week(0).runs >= 3) streak++ // this week already counts
+
+  return { weeks: Array.from({ length: weeks }, (_, i) => week(weeks - 1 - i)), streak }
 }

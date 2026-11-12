@@ -3,7 +3,9 @@
 import { format, parseISO } from 'date-fns'
 import type { CalcLine, PlanDay, WeekPlan } from '@/lib/trainingPlan'
 import { KM_PER_MILE, formatPace, type Unit } from '@/lib/units'
+import type { CheckIn, Level, TagKey } from '@/lib/checkIn'
 import { HelpLink } from './ChartCard'
+import CheckInTags from './CheckInTags'
 
 function distance(km: number, unit: Unit) {
   return `${(unit === 'mi' ? km / KM_PER_MILE : km).toFixed(1)} ${unit}`
@@ -30,65 +32,43 @@ function calcValue(line: CalcLine, unit: Unit) {
   })
 }
 
-/** Same bands as the Acute : Chronic Load card. */
-function ratioClass(ratio: number) {
-  if (ratio >= 1.5) return 'text-rose-600'
-  if (ratio > 1.3) return 'text-amber-600'
-  if (ratio < 0.8) return 'text-sky-600'
-  return 'text-emerald-600'
-}
-
 function DayRow({ day, unit }: { day: PlanDay; unit: Unit }) {
   const isRun = day.runMin > 0
   const long = day.type === 'long'
   const extras = [day.strength && '+ Strength', day.strides && '+ strides'].filter(Boolean)
   return (
-    <div className="grid grid-cols-[6.5rem_1fr_auto_2.25rem] gap-3 items-baseline py-2 border-t border-zinc-100 text-sm">
+    <div className="grid grid-cols-[6.5rem_1fr_auto] gap-3 items-baseline py-2 border-t border-zinc-100 text-sm">
       <span className="text-zinc-400 tabular-nums">{format(parseISO(day.date), 'EEE, MMM d')}</span>
       {isRun ? (
         <span className={`font-medium ${long ? 'text-blue-600' : 'text-emerald-600'}`}>
           {long && 'Long run '}
           {minutesWithDistance(day.runMin, day.distanceKm, unit, { estimated: true })}
-          {day.loadCut && <span className="font-normal text-amber-600"> · shortened for load</span>}
         </span>
       ) : (
         <span className="text-zinc-400">
-          Rest{day.loadRest && <span className="text-rose-600"> · load ratio too high to run</span>}
+          Rest{day.restReason && <span className="text-amber-600"> · {day.restReason.toLowerCase()}</span>}
         </span>
       )}
       <span className="text-xs text-violet-600 text-right">{extras.join(' ')}</span>
-      <span
-        className={`text-xs tabular-nums text-right ${day.loadRatio == null ? '' : ratioClass(day.loadRatio)}`}
-        title="Projected load ratio at the end of this day"
-      >
-        {day.loadRatio?.toFixed(2)}
-      </span>
     </div>
   )
 }
 
-/** Why the week looks the way it does when today's load ratio is above 1.3. */
-function loadNotice(plan: WeekPlan) {
-  if (plan.currentAcwr == null) return null
-  const ratio = plan.currentAcwr.toFixed(2)
-  if (plan.loadState === 'high') {
-    return {
-      classes: 'text-rose-700 bg-rose-50 border-rose-200',
-      text: `Load ratio ${ratio} is in the overreach zone. Rest until it is under 1.5, then run on alternate days only, with no run over ${plan.maxRunMin} min.`,
-    }
-  }
-  if (plan.loadState === 'elevated') {
-    return {
-      classes: 'text-amber-700 bg-amber-50 border-amber-200',
-      text: `Load ratio ${ratio} is above 1.3. Runs are on alternate days only, and the week holds instead of building.`,
-    }
-  }
-  return null
-}
-
-export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit: Unit }) {
+export default function TrainingPlanCard({
+  plan,
+  unit,
+  checkIn,
+  onTag,
+  saveFailed = false,
+}: {
+  plan: WeekPlan
+  unit: Unit
+  checkIn: CheckIn
+  /** Omitted for the demo, which sees the plan without the check-in tags. */
+  onTag?: (key: TagKey, level: Level) => void
+  saveFailed?: boolean
+}) {
   const paceLabel = plan.easyPaceMinPerKm == null ? null : formatPace(plan.easyPaceMinPerKm, unit)
-  const notice = loadNotice(plan)
 
   return (
     <div className="bg-white rounded-2xl border border-zinc-200 p-5 flex flex-col">
@@ -106,8 +86,9 @@ export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit:
         {plan.tags.length > 0 && ` · ${plan.tags.join(' · ')}`}
       </p>
 
-      {notice && (
-        <p className={`mt-2 rounded-lg border px-3 py-2 text-xs ${notice.classes}`}>{notice.text}</p>
+      {onTag && <CheckInTags checkIn={checkIn} onTag={onTag} />}
+      {saveFailed && (
+        <p className="mt-2 text-xs text-rose-600">Couldn&apos;t save that change. Try again.</p>
       )}
 
       <details className="group mt-2">
@@ -151,8 +132,7 @@ export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit:
       <p className="text-xs text-zinc-400 mt-3">
         All runs easy, HR ≤ {plan.hrCap}. Walk to stay under.
         {paceLabel && ` Distances use your recent easy pace (${paceLabel}).`}
-        {plan.loadState != null &&
-          ' The number on the right is the load ratio projected for the end of each day if you follow the plan.'}
+        {plan.maxRunKm != null && ` No run over ${distance(plan.maxRunKm, unit)} this week.`}
       </p>
     </div>
   )

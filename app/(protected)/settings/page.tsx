@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import LoginHistory from '@/components/settings/LoginHistory'
 import BirthdaySetting from '@/components/settings/BirthdaySetting'
+import HeartRateSetting from '@/components/settings/HeartRateSetting'
 import TimeZoneSetting from '@/components/settings/TimeZoneSetting'
 
 export default async function SettingsPage() {
@@ -41,6 +42,10 @@ export default async function SettingsPage() {
           </div>
           <div className="px-5 py-5">
             <BirthdaySetting />
+          </div>
+          <div className="px-5 py-5 space-y-3">
+            <h3 className="text-sm font-medium text-zinc-900">Resting and max heart rate</h3>
+            <HeartRateSetting />
           </div>
           <div className="px-5 py-5 space-y-3">
             <h3 className="text-sm font-medium text-zinc-900">Time zone</h3>

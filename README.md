@@ -50,7 +50,8 @@ Trends across many runs. A date slider at the top drives most charts; the traini
 
 | Chart | The question it answers |
 |---|---|
-| **Training Plan** | What should my next 7 days look like, based on my recent load? |
+| **Training Plan** | What should my next 7 days look like, given my recent weeks and how I feel? |
+| **Base Building** | Are my easy minutes and long run growing? |
 | **Weekly Volume** | Is my mileage consistent and growing gradually? |
 | **Aerobic Development** | Is the same distance costing my heart less over time? |
 | **Aerobic Efficiency** | How much speed does each heartbeat buy me? |
@@ -60,7 +61,7 @@ Trends across many runs. A date slider at the top drives most charts; the traini
 | **Run/Walk Split** | How much of each run is running vs. walking breaks? |
 | **Performance vs. Weather** | How much do heat and humidity slow *me* down? |
 | **Fitness & Fatigue** | Where are my fitness, fatigue and form (CTL / ATL / TSB)? |
-| **Acute : Chronic Load** | Am I ramping up faster than my body can absorb? |
+| **Acute : Chronic Load** | How fast am I ramping up compared with my recent weeks? |
 | **Long Run Progression** | Is my longest run of the week building steadily? |
 
 ![Analysis page: weekly volume and aerobic development](public/screenshots/analysis.png)
@@ -150,7 +151,7 @@ You never log runs by hand. Use either option, or both:
 ## A simple weekly routine
 
 - **After each run:** open its Deep Dive. Was the effort what you intended?
-- **Once a week:** open Analysis. Check Effort Distribution (enough easy?), Acute : Chronic Load (ramping safely?) and Weekly Volume (consistent?).
+- **Once a week:** open Analysis. Check Effort Distribution (enough easy?), Base Building (easy minutes and long run growing?) and Weekly Volume (consistent?).
 - **Once a month:** widen the date range and look at Aerobic Efficiency and Aerobic Pace. Is the engine growing?
 
 ---

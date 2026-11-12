@@ -5,6 +5,7 @@ import AnalysisView from '@/components/analysis/AnalysisView'
 import { hrProfile, withoutBirthDate, zonesOn } from '@/lib/analysis'
 import { prisma } from '@/lib/prisma'
 import { timeZoneFrom } from '@/lib/userSettings'
+import { checkInFrom } from '@/lib/checkIn'
 import { movementSplit, runningForm, timeInZones } from '@/lib/runAnalysis'
 
 export const metadata = {
@@ -46,6 +47,8 @@ export default async function AnalysisPage() {
       profile={clientProfile}
       timeZone={timeZoneFrom(settings)}
       isDemo={isDemo}
+      // The check-in tags are personal: the demo gets none and can't set any.
+      checkIn={isDemo ? null : checkInFrom(settings?.checkIn)}
       activities={activities.map(({ stream, ...a }) => {
         const time = stream?.time as number[] | undefined
         const hr = stream?.heartrate as number[] | null | undefined

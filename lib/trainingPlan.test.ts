@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { addDaysToKey } from '@/lib/activitySummary'
-import {
-  acuteChronicRatio,
-  fitnessFatigue,
-  type AnalysisActivity,
-  type HrProfile,
-} from '@/lib/analysis'
+import type { AnalysisActivity } from '@/lib/analysis'
+import { defaultCheckIn, type CheckIn, type Level, type TagKey } from '@/lib/checkIn'
 import {
   HR_CAP,
   layoutWeek,
@@ -19,7 +15,6 @@ import {
 // Synthetic history only. Runs sit at noon UTC so their local day is the
 // same in any test-runner time zone; plans use timeZone 'UTC'.
 
-const PROFILE: HrProfile = { birthDate: '2002-07-23', age: null, recordedMax: 196 }
 const MONDAY = '2026-11-02'
 const PACE = 8 // min/km
 
@@ -59,8 +54,15 @@ function hist(volumes: number[], base = 150) {
   return weeks(MONDAY, [...Array(16).fill(base), ...volumes])
 }
 
-function plan(activities: AnalysisActivity[], today = MONDAY) {
-  return planNextWeek({ activities, profile: PROFILE, today, timeZone: 'UTC' })
+function plan(activities: AnalysisActivity[], today = MONDAY, checkIn?: CheckIn) {
+  return planNextWeek({ activities, today, timeZone: 'UTC', checkIn })
+}
+
+/** A check-in with the given tags set, all on `since`. */
+function feeling(tags: Partial<Record<TagKey, Level>>, since = MONDAY): CheckIn {
+  const checkIn = defaultCheckIn()
+  for (const [key, level] of Object.entries(tags)) checkIn[key as TagKey] = { level, since }
+  return checkIn
 }
 
 const weekday = (d: string) => new Date(`${d}T00:00:00Z`).getUTCDay()
@@ -92,7 +94,7 @@ describe('rule 1: HR cap', () => {
 describe('rule 2: at most +10% over last week', () => {
   it('builds 10% on the last full week, rounded down to 5', () => {
     const p = plan(hist([110, 150]))
-    expect(p.phase).toEqual({ kind: 'build', week: 2 })
+    expect(p.phase).toEqual({ kind: 'build', week: 2, resumed: false })
     expect(p.totalRunMin).toBe(165)
     expect(labels(p)).toContain('Build week 2 · +10% × 150')
   })
@@ -106,17 +108,54 @@ describe('rule 2: at most +10% over last week', () => {
 })
 
 describe('rule 3: cutback every 4th week', () => {
-  it('cuts back to 75% after 3 build weeks', () => {
+  it('cuts back to 80% after 3 build weeks', () => {
     const p = plan(hist([110, 130, 140, 150]))
     expect(p.phase).toEqual({ kind: 'cutback' })
     expect(p.tags).toContain('Cutback week')
-    expect(p.totalRunMin).toBe(110) // 0.75 × 150 = 112.5
+    expect(p.totalRunMin).toBe(120) // 0.8 × 150
   })
 
-  it('resets the count after a cutback in history', () => {
-    const p = plan(hist([110, 150, 160]))
-    expect(p.phase).toEqual({ kind: 'build', week: 3 })
-    expect(p.totalRunMin).toBe(175)
+  it('goes back to the pre-cutback week afterwards, then builds on it', () => {
+    const p = plan(hist([110, 130, 140, 150, 120]))
+    expect(p.phase).toEqual({ kind: 'build', week: 1, resumed: true })
+    expect(p.totalRunMin).toBe(150)
+    expect(labels(p)).toContain('Back to the week before the cutback')
+    const next = plan(hist([110, 130, 140, 150, 120, 150]))
+    expect(next.phase).toEqual({ kind: 'build', week: 2, resumed: false })
+    expect(next.totalRunMin).toBe(165)
+  })
+
+  it('builds from last week, not the earlier one, after a much smaller week', () => {
+    const p = plan(hist([150, 150, 150, 60])) // 40% of the week before: not a planned cutback
+    expect(p.phase).toMatchObject({ kind: 'build', resumed: false })
+    expect(p.totalRunMin).toBe(90)
+  })
+
+  it('does not call a cutback on steady weeks', () => {
+    const p = plan(hist([150, 150, 150, 150]))
+    expect(p.phase).toMatchObject({ kind: 'build' })
+    expect(p.totalRunMin).toBe(165)
+  })
+
+  it('skips the cutback while it would fall below the minimum week', () => {
+    const p = plan(hist([80, 95, 100, 110], 100))
+    expect(p.phase).toMatchObject({ kind: 'build' })
+    expect(p.totalRunMin).toBe(120)
+  })
+
+  it('grows when the plan is followed exactly', () => {
+    let history = weeks(MONDAY, Array(16).fill(120))
+    let day = MONDAY
+    const totals: number[] = []
+    for (let w = 0; w < 16; w++) {
+      const p = plan(history, day)
+      totals.push(p.totalRunMin)
+      history = [...history, ...runDays(p).map(d => run(d.date, d.runMin))]
+      day = addDaysToKey(day, 7)
+    }
+    // Every 4 weeks the plan is ahead of where it was.
+    for (let w = 4; w < totals.length; w++) expect(totals[w]).toBeGreaterThan(totals[w - 4])
+    expect(totals.at(-1)!).toBeGreaterThan(200)
   })
 
   it('resets the count after a layoff restart', () => {
@@ -128,24 +167,10 @@ describe('rule 3: cutback every 4th week', () => {
   })
 })
 
-describe('rule 4: projected load ratio ≤ 1.3', () => {
-  const spike = () => hist([110, 280])
-
-  it('trims a spiking week until the projection is ≤ 1.3', () => {
-    const p = plan(spike())
-    expect(p.trimmed).toBe(true)
-    expect(p.projectedAcwr!).toBeLessThanOrEqual(1.3)
-    expect(p.totalRunMin).toBeLessThan(220)
-    expect(p.tags).toContain('Trimmed for load')
-    expect(p.calc.some(c => c.kind === 'warn' && c.label.startsWith('Trimmed'))).toBe(true)
-  })
-
-  it('still builds exactly +10% when the ratio is below 0.8', () => {
-    const history = hist([...Array(6).fill(260), 100], 260)
-    const load = fitnessFatigue(history, PROFILE, 7, new Date(`${addDaysToKey(MONDAY, -1)}T12:00:00Z`))
-    expect(acuteChronicRatio(load)!).toBeLessThan(0.8)
-    const p = plan(history)
-    expect(p.phase).toEqual({ kind: 'build', week: 1 })
+describe('rule 4: a small week is built on, not made up for', () => {
+  it('builds exactly +10% after a small week', () => {
+    const p = plan(hist([...Array(6).fill(260), 100], 260))
+    expect(p.phase).toMatchObject({ kind: 'build', week: 1 })
     expect(p.totalRunMin).toBe(110) // 1.1 × 100
   })
 })
@@ -158,14 +183,23 @@ describe('rule 5: long run and the single-run cap', () => {
     expect(long.runMin).toBeLessThanOrEqual(0.3 * p.totalRunMin)
   })
 
-  it('never plans a run over 110% of the longest in the last 30 days', () => {
-    // 6 weeks of 5 × 30 min, then a long layout would want 0.3 × 165 = 45.
+  it('never plans a run over 110% of the longest distance in the last 30 days', () => {
+    // 6 weeks of 5 × 31 min (3.875 km): the cap is 4.26 km = 34 min at 8 min/km.
     const history = Array.from({ length: 42 }, (_, i) => addDaysToKey(MONDAY, -42 + i))
       .filter(d => ![0, 5].includes(weekday(d)))
-      .map(d => run(d, 30))
-    const p = plan([...weeks(addDaysToKey(MONDAY, -42), Array(12).fill(150)), ...history])
-    expect(p.maxRunMin).toBe(35) // max(1.1 × 30, 30 + 5)
-    for (const d of p.days) expect(d.runMin).toBeLessThanOrEqual(35)
+      .map(d => run(d, 31))
+    const p = plan([...weeks(addDaysToKey(MONDAY, -42), Array(12).fill(155)), ...history])
+    expect(p.maxRunMin).toBe(34)
+    expect(p.maxRunKm).toBeCloseTo(34 / PACE)
+    expect(Math.max(...p.days.map(d => d.runMin))).toBe(34) // to the minute, not rounded to 5
+    for (const d of p.days) expect(d.distanceKm ?? 0).toBeLessThanOrEqual(1.1 * (31 / PACE) + 1e-9)
+  })
+
+  it('uses distance, not time: a slow long run does not raise the cap', () => {
+    const slow = { ...run(addDaysToKey(MONDAY, -3), 80), distance: 5 } // 80 min for 5 km
+    const p = plan([...hist([150, 150]), slow])
+    // Longest by distance is 50 min ÷ 8 = 6.25 km → 6.875 km → 55 min.
+    expect(p.maxRunMin).toBe(55)
   })
 
   it('drops minutes the cap cannot place, and says so', () => {
@@ -291,7 +325,6 @@ describe('choosing the days', () => {
       expect(runs).toHaveLength(runsPerWeek(total))
       expect(runs.reduce((s, d) => s + d.runMin, 0)).toBe(total)
       for (const d of runs) {
-        expect(d.runMin % 5).toBe(0)
         expect(d.runMin).toBeGreaterThanOrEqual(20)
       }
       days.forEach((d, i) => {
@@ -350,9 +383,10 @@ describe('choosing the days', () => {
   })
 
   it('keeps forced rest days free and marks them', () => {
-    const days = layoutWeek(140, ctx(MONDAY, { strict: true, forcedRest: new Set([0, 1]) }))
+    const forcedRest = new Map([[0, 'Pain'], [1, 'Pain']])
+    const days = layoutWeek(140, ctx(MONDAY, { strict: true, forcedRest }))
     expect(idx(days)).toEqual([2, 4, 6])
-    expect(days.map(d => d.loadRest)).toEqual([true, true, false, false, false, false, false])
+    expect(days.map(d => d.restReason)).toEqual(['Pain', 'Pain', null, null, null, null, null])
   })
 
   it('makes Sunday the long run when Saturday was missed, and next Saturday too', () => {
@@ -371,104 +405,91 @@ describe('choosing the days', () => {
   })
 })
 
-describe('load ratio steers the week', () => {
-  // 16 steady weeks, a layoff, then a return run far over the ladder.
-  const ratioToday = (history: AnalysisActivity[], today = MONDAY) =>
-    acuteChronicRatio(fitnessFatigue(history, PROFILE, 7, new Date(`${today}T12:00:00Z`)))!
+describe('check-in tags', () => {
+  const history = hist([110, 150]) // a normal build week: 165 min, 4 runs
 
-  it('reports the same ratio as the load-ratio card', () => {
-    const history = hist([0, 0, 0, 0, 150, 330])
-    expect(plan(history).currentAcwr).toBeCloseTo(ratioToday(history))
-    const ranToday = [...history, run(MONDAY, 30)]
-    expect(plan(ranToday).currentAcwr).toBeCloseTo(ratioToday(ranToday))
+  it('changes nothing when every tag is fine', () => {
+    expect(plan(history, MONDAY, defaultCheckIn())).toEqual(plan(history))
+    expect(plan(history).adjusted).toBe(false)
   })
 
-  it('rests while the ratio is ≥ 1.5, then runs on alternate days', () => {
-    const p = plan(hist([0, 0, 0, 0, 150, 330]))
-    expect(p.currentAcwr!).toBeGreaterThanOrEqual(1.5)
-    expect(p.loadState).toBe('high')
-    expect(p.days[0]).toMatchObject({ runMin: 0, loadRest: true })
-    expect(p.days.filter(d => d.loadRest).length).toBeGreaterThanOrEqual(1)
-    expect(p.spaced).toBe(true)
-    expect(backToBack(p.days)).toBe(false)
+  it.each<[Partial<Record<TagKey, Level>>, number, number, boolean]>([
+    // tags, week minutes, rest days, alternate days only
+    [{ tiredness: 1 }, 150, 0, false],
+    [{ sleep: 1 }, 150, 0, false],
+    [{ sleep: 2 }, 150, 0, true],
+    [{ tiredness: 2 }, 150, 1, true],
+    [{ soreness: 1 }, 150, 0, true],
+    [{ soreness: 2 }, 110, 1, true], // 75% × 150 = 112.5
+    [{ pain: 1 }, 120, 0, true], // 150 held, but 4 alternate days × 30 min
+    [{ pain: 2 }, 90, 2, true], // 110, but only 3 alternate days are left × 30 min
+  ])('%j → %i min, %i rest days', (tags, total, rest, spaced) => {
+    const p = plan(history, MONDAY, feeling(tags))
+    expect(p.adjusted).toBe(true)
+    expect(p.tags).toContain('Adjusted for check-in')
+    expect(p.totalRunMin).toBe(total)
+    expect(p.totalRunMin).toBeLessThanOrEqual(p.lastWeekRunMin) // never a build
+    expect(p.days.filter(d => d.restReason).length).toBe(rest)
+    expect(p.days.slice(0, rest).every(d => d.runMin === 0 && d.restReason)).toBe(true)
+    expect(p.spaced).toBe(spaced)
+    if (spaced) expect(backToBack(p.days)).toBe(false)
     expect(p.days.some(d => d.strides)).toBe(false)
-    expect(labels(p)).toContain('Load ratio today')
-    expect(labels(p)).toContain('Rest while the load ratio is ≥ 1.5')
-    expect(p.calc.at(-1)!.kind).toBe('result')
-    expect(p.calc.at(-1)!.minutes).toBe(p.totalRunMin)
+    expect(p.calc.at(-1)).toMatchObject({ kind: 'result', minutes: total })
   })
 
-  it('rests several days in a row when one is not enough', () => {
-    const p = plan(hist([0, 0, 0, 0, 0, 0, 200, 400]))
-    expect(p.currentAcwr!).toBeGreaterThan(2)
-    const first = p.days.findIndex(d => d.runMin > 0)
-    expect(first).toBeGreaterThanOrEqual(3)
-    expect(p.days.slice(0, first).every(d => d.loadRest)).toBe(true)
-    // A day's ratio before running is the previous evening's with one more
-    // day of decay (÷ 7 acute, ÷ 42 chronic). The first run comes on the
-    // first day that is under 1.5.
-    const morning = (i: number) => (p.days[i - 1].loadRatio! * (6 / 7)) / (41 / 42)
-    expect(morning(first)).toBeLessThan(1.5)
-    expect(morning(first - 1)).toBeGreaterThanOrEqual(1.5)
-  })
-
-  it('projects each day from the runs planned before it', () => {
-    const p = plan(hist([0, 0, 0, 0, 150, 330]))
-    p.days.forEach((d, i) => {
-      if (i === 0) return
-      const prev = p.days[i - 1].loadRatio!
-      // Rest days decay the ratio; run days lift it above where rest would leave it.
-      if (d.runMin === 0) expect(d.loadRatio!).toBeLessThan(prev)
-      else expect(d.loadRatio!).toBeGreaterThan(prev * 0.878)
-    })
-    expect(p.days[6].loadRatio).toBeCloseTo(p.projectedAcwr!)
-  })
-
-  it('never lets a planned run lift the ratio to 1.5 while load is high', () => {
-    for (const v of [[0, 0, 0, 0, 150, 330], [0, 0, 0, 0, 0, 0, 200, 400], [0, 0, 0, 100, 300]]) {
-      for (const off of [0, 1, 2, 3]) {
-        const p = plan(hist(v), addDaysToKey(MONDAY, off))
-        if (p.loadState === 'ok') continue
-        for (const d of p.days) {
-          if (d.runMin > 20) expect(d.loadRatio!).toBeLessThan(1.5)
-          if (d.loadCut) expect(d.runMin).toBeGreaterThanOrEqual(20)
-        }
-      }
+  it('caps pain weeks at 30-minute runs', () => {
+    for (const level of [1, 2] as const) {
+      const p = plan(hist([200, 220], 200), MONDAY, feeling({ pain: level }))
+      expect(p.maxRunMin).toBe(30)
+      for (const d of p.days) expect(d.runMin).toBeLessThanOrEqual(30)
     }
   })
 
-  it('lets the week drop to 3 × 20 and caps runs at the recent longest in the overreach zone', () => {
-    const p = plan(hist([0, 0, 0, 0, 0, 0, 200, 400]))
-    expect(p.loadState).toBe('high')
-    expect(p.totalRunMin).toBeLessThan(90)
-    expect(p.totalRunMin).toBeGreaterThanOrEqual(40)
-    expect(p.maxRunMin).toBe(130) // longest in 30 days is 400 / 3, no +10%
+  it('allows no run longer than the recent longest when legs are sore', () => {
+    const fine = plan(history)
+    const sore = plan(history, MONDAY, feeling({ soreness: 1 }))
+    expect(fine.maxRunMin).toBe(55) // 110% of 50 min
+    expect(sore.maxRunMin).toBe(50)
   })
 
-  it('holds instead of building, on alternate days, when the ratio is above 1.3', () => {
-    // A layoff long enough ago that the ladder is done, then a big jump.
-    const history = hist([0, 0, 75, 110, 135, 150, 150, 260])
-    const p = plan(history)
-    expect(p.phase.kind).toBe('build')
-    expect(p.loadState).toBe('elevated')
-    expect(p.totalRunMin).toBeLessThanOrEqual(p.lastWeekRunMin)
-    expect(p.spaced).toBe(true)
-    expect(backToBack(p.days)).toBe(false)
-    expect(p.days.some(d => d.loadRest)).toBe(false)
+  it('takes the strictest of several tags', () => {
+    const p = plan(history, MONDAY, feeling({ tiredness: 1, soreness: 2, pain: 2 }))
+    expect(p.days.filter(d => d.restReason).map(d => d.restReason)).toEqual(['Pain', 'Pain'])
+    expect(p.maxRunMin).toBe(30)
+    expect(labels(p)).toEqual(
+      expect.arrayContaining(['Pain · strong', 'Leg soreness / tightness · high', 'Tiredness / stress · medium']),
+    )
   })
 
-  it('leaves a normal week alone', () => {
-    const p = plan(hist([110, 150]))
-    expect(p.loadState).toBe('ok')
-    expect(p.spaced).toBe(false)
-    expect(p.days.some(d => d.loadRest)).toBe(false)
+  it('counts rest days from the day the tag was set, not from today', () => {
+    const since = addDaysToKey(MONDAY, -1)
+    const p = plan(history, MONDAY, feeling({ pain: 2 }, since))
+    expect(p.days.map(d => d.restReason)).toEqual(['Pain', null, null, null, null, null, null])
+    const later = plan(history, addDaysToKey(MONDAY, 2), feeling({ pain: 2 }, since))
+    expect(later.days.some(d => d.restReason)).toBe(false)
+    expect(later.adjusted).toBe(true) // the tag never expires: still a short, spaced week
+    expect(later.maxRunMin).toBe(30)
   })
 
-  it('does not steer by the ratio in the first 12 weeks of history', () => {
-    const p = plan(weeks(MONDAY, [60, 60, 60, 60, 60, 60, 300]))
-    expect(p.currentAcwr!).toBeGreaterThan(1.5)
-    expect(p.loadState).toBeNull()
-    expect(p.days.some(d => d.loadRest)).toBe(false)
+  it('rests every day while sick', () => {
+    const p = plan(history, MONDAY, feeling({ sick: 1 }, addDaysToKey(MONDAY, -20)))
+    expect(p.totalRunMin).toBe(0)
+    expect(p.days.every(d => d.restReason === 'Sick')).toBe(true)
+    expect(labels(p)).toContain('Sick · yes')
+  })
+
+  it('applies during a return from a layoff and with too little data', () => {
+    const sunday = addDaysToKey(MONDAY, 6)
+    const gap = plan(hist([110, 150]), sunday, feeling({ tiredness: 2 }, sunday))
+    expect(gap.phase.kind).toBe('return')
+    expect(gap.days[0].restReason).toBe('Tiredness / stress')
+    const fresh = plan([], MONDAY, feeling({ pain: 2 }))
+    expect(fresh.days.slice(0, 2).every(d => d.restReason === 'Pain')).toBe(true)
+  })
+
+  it('is deterministic', () => {
+    const tags = feeling({ soreness: 1, sleep: 2 })
+    expect(plan(history, MONDAY, tags)).toEqual(plan(history, MONDAY, tags))
   })
 })
 
@@ -494,14 +515,6 @@ describe('edge cases', () => {
     const p = plan([run(addDaysToKey(MONDAY, -10), 60), run(addDaysToKey(MONDAY, -5), 60)])
     expect(p.flags).toContain('not-enough-data')
     expect(p.totalRunMin).toBe(90)
-  })
-
-  it('flags load-high when even the minimum week projects above 1.3', () => {
-    const p = plan(weeks(MONDAY, [30, 30, 600]))
-    expect(p.minimumWeek).toBe(true)
-    expect(p.flags).toContain('load-high')
-    expect(p.projectedAcwr!).toBeGreaterThan(1.3)
-    expect(p.calc.some(c => c.text === 'keep everything easy')).toBe(true)
   })
 
   it('recomputes after a missed day without adding the missed minutes back', () => {
@@ -549,7 +562,7 @@ describe('the working ("how this was set")', () => {
   it('lists the cutback math', () => {
     expect(labels(plan(hist([110, 130, 140, 150])))).toEqual([
       'Last full week · Oct 26 – Nov 1',
-      '3 build weeks in a row → cutback · 75% × 150',
+      '3 build weeks in a row → cutback · 80% × 150',
       'Rounded down to 5',
     ])
   })

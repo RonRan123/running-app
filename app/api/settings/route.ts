@@ -10,6 +10,8 @@ function serialize(settings: UserSettings | null) {
     timeZone: settings?.timeZone ?? DEFAULT_TIME_ZONE,
     weeklyGoalType: settings?.weeklyGoalType ?? null,
     weeklyGoalTarget: settings?.weeklyGoalTarget ?? null,
+    restingHr: settings?.restingHr ?? null,
+    maxHr: settings?.maxHr ?? null,
   }
 }
 
@@ -33,6 +35,8 @@ export async function PUT(request: Request) {
     timeZone?: string
     weeklyGoalType?: string | null
     weeklyGoalTarget?: number | null
+    restingHr?: number | null
+    maxHr?: number | null
   } = {}
 
   // Birthday as yyyy-MM-dd, stored at UTC midnight so the calendar date never shifts.
@@ -82,6 +86,24 @@ export async function PUT(request: Request) {
       update.weeklyGoalType = type
       update.weeklyGoalTarget = target
     }
+  }
+
+  // Heart-rate overrides: a whole number of bpm, or null to go back to the default.
+  for (const [field, min, max] of [
+    ['restingHr', 30, 100],
+    ['maxHr', 120, 230],
+  ] as const) {
+    if (body?.[field] === undefined) continue
+    if (body[field] === null) {
+      update[field] = null
+      continue
+    }
+    const bpm = Number(body[field])
+    if (!Number.isInteger(bpm) || bpm < min || bpm > max) {
+      const name = field === 'restingHr' ? 'Resting' : 'Max'
+      return Response.json({ error: `${name} heart rate must be between ${min} and ${max} bpm` }, { status: 400 })
+    }
+    update[field] = bpm
   }
 
   if (Object.keys(update).length === 0) {
