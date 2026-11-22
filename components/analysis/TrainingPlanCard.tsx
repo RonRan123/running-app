@@ -4,6 +4,7 @@ import { format, parseISO } from 'date-fns'
 import type { CalcLine, PlanDay, WeekPlan } from '@/lib/trainingPlan'
 import { KM_PER_MILE, formatPace, type Unit } from '@/lib/units'
 import { HelpLink } from './ChartCard'
+import { fillTokens } from '@/lib/raceFormat'
 
 function distance(km: number, unit: Unit) {
   return `${(unit === 'mi' ? km / KM_PER_MILE : km).toFixed(1)} ${unit}`
@@ -33,11 +34,16 @@ function calcValue(line: CalcLine, unit: Unit) {
 function DayRow({ day, unit }: { day: PlanDay; unit: Unit }) {
   const isRun = day.runMin > 0
   const long = day.type === 'long'
-  const extras = [day.strength && '+ Strength', day.strides && '+ strides'].filter(Boolean)
+  const extras = [day.strength && '+ Strength', day.strides && '+ strides', day.hills && '+ hill sprints'].filter(Boolean)
   return (
     <div className="grid grid-cols-[6.5rem_1fr_auto] gap-3 items-baseline py-2 border-t border-zinc-100 text-sm">
       <span className="text-zinc-400 tabular-nums">{format(parseISO(day.date), 'EEE, MMM d')}</span>
-      {isRun ? (
+      {isRun && day.workout ? (
+        <span className="font-medium text-orange-700">
+          {day.workout.label} · {minutesWithDistance(day.runMin, day.distanceKm, unit, { estimated: true })}
+          <span className="block text-xs font-normal text-zinc-500">{fillTokens(day.workout.detail, unit)}</span>
+        </span>
+      ) : isRun ? (
         <span className={`font-medium ${long ? 'text-blue-600' : 'text-emerald-600'}`}>
           {long && (day.movedLong ? 'Long run (moved from Sat) ' : 'Long run ')}
           {minutesWithDistance(day.runMin, day.distanceKm, unit, { estimated: true })}
@@ -108,7 +114,9 @@ export default function TrainingPlanCard({ plan, unit }: { plan: WeekPlan; unit:
       </div>
 
       <p className="text-xs text-zinc-400 mt-3">
-        All runs easy, HR ≤ {plan.hrCap}. Walk to stay under.
+        {plan.days.some(d => d.workout)
+          ? `Easy and long runs HR ≤ ${plan.hrCap}; the workout day is exempt. Walk to stay under.`
+          : `All runs easy, HR ≤ ${plan.hrCap}. Walk to stay under.`}
         {paceLabel && ` Distances use your recent easy pace (${paceLabel}).`}
       </p>
     </div>

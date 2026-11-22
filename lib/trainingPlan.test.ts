@@ -393,3 +393,39 @@ describe('the working ("how this was set")', () => {
     ])
   })
 })
+
+describe('race plan hint', () => {
+  const race = {
+    label: 'NYC Half · Build wk 8',
+    targetMin: 120,
+    longMin: 50,
+    workout: { label: 'Fartlek', detail: '4 × 1 min at 10K effort' },
+    hills: null,
+  }
+  const racePlan = (r = race) =>
+    planNextWeek({ activities: hist([110, 150]), profile: PROFILE, today: MONDAY, timeZone: 'UTC', race: r })
+
+  it('takes the lower of the race target and its own ceiling', () => {
+    const own = plan(hist([110, 150]))
+    const p = racePlan()
+    expect(p.totalRunMin).toBeLessThanOrEqual(120)
+    expect(p.totalRunMin).toBeLessThan(own.totalRunMin)
+    expect(p.tags).toContain(race.label)
+    // A race target above the safety ceiling never raises the week.
+    expect(racePlan({ ...race, targetMin: 900 }).totalRunMin).toBe(own.totalRunMin)
+  })
+
+  it('puts the workout on a midweek easy day, never the day before the long run', () => {
+    const p = racePlan()
+    const days = p.days.filter(d => d.workout)
+    expect(days).toHaveLength(1)
+    expect([2, 3, 4]).toContain(weekday(days[0].date))
+    expect(days[0].workout!.label).toBe('Fartlek')
+  })
+
+  it('leaves the plan unchanged without a race', () => {
+    expect(planNextWeek({ activities: hist([110, 150]), profile: PROFILE, today: MONDAY, timeZone: 'UTC', race: null })).toEqual(
+      plan(hist([110, 150])),
+    )
+  })
+})

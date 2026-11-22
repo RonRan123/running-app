@@ -6,6 +6,8 @@ import { hrProfile, withoutBirthDate, zonesOn } from '@/lib/analysis'
 import { prisma } from '@/lib/prisma'
 import { timeZoneFrom } from '@/lib/userSettings'
 import { movementSplit, runningForm, timeInZones } from '@/lib/runAnalysis'
+import { loadRaceData, raceView, raceWeekHint } from '@/lib/raceServer'
+import type { RaceWeekHint } from '@/lib/trainingPlan'
 
 export const metadata = {
   title: 'Analysis — Running Dashboard',
@@ -41,11 +43,26 @@ export default async function AnalysisPage() {
   const latest = activities.at(-1)
   const clientProfile = isDemo && latest ? withoutBirthDate(profile, latest.date) : profile
 
+  // The nearest upcoming race steers the 7-day plan. Race goals are personal,
+  // so the demo never gets one.
+  let raceHint: RaceWeekHint | null = null
+  if (!isDemo) {
+    const goal = await prisma.raceGoal.findFirst({
+      where: { date: { gte: new Date(Date.now() - 86_400_000) } },
+      orderBy: { date: 'asc' },
+    })
+    if (goal) {
+      const data = await loadRaceData(session)
+      raceHint = raceWeekHint(raceView(goal, data, { trend: false }), data.easyPace)
+    }
+  }
+
   return (
     <AnalysisView
       profile={clientProfile}
       timeZone={timeZoneFrom(settings)}
       isDemo={isDemo}
+      raceHint={raceHint}
       activities={activities.map(({ stream, ...a }) => {
         const time = stream?.time as number[] | undefined
         const hr = stream?.heartrate as number[] | null | undefined
