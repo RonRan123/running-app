@@ -254,14 +254,20 @@ export default function RacePlanView({ view }: { view: RaceView }) {
   const goal = view.goal
 
   const header = (
+    <div className="space-y-4">
+      {/* Back — same pattern as a run's and a segment's detail page */}
+      <Link
+        href="/goals"
+        className="inline-flex items-center gap-1.5 min-h-8 text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+      >
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        All goals
+      </Link>
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-sm text-zinc-500">
-          <Link href="/goals" className="hover:text-zinc-900">
-            Goals
-          </Link>{' '}
-          / Race plan
-        </p>
+        <p className="text-sm text-zinc-500">Race plan</p>
         <h1 className="text-2xl font-semibold text-zinc-900 mt-1">{goal.name}</h1>
         <p className="text-sm text-zinc-600 mt-1">
           {format(parseISO(goal.date), 'EEE, MMM d, yyyy')} · {fmtDistance(goal.distanceKm, unit)} ·{' '}
@@ -271,6 +277,7 @@ export default function RacePlanView({ view }: { view: RaceView }) {
         </p>
       </div>
       <UnitToggle unit={unit} onChange={changeUnit} />
+    </div>
     </div>
   )
 
