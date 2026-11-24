@@ -1,5 +1,5 @@
 import type { Session } from 'next-auth'
-import type { RaceGoal } from '@prisma/client'
+import { Prisma, type RaceGoal } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { findActivities } from '@/lib/activities'
 import { hrProfile, withoutExcluded, type HrProfile } from '@/lib/analysis'
@@ -22,6 +22,23 @@ export interface RaceData {
   easyPace: number | null // min/km, median of the last 28 days
 }
 
+/**
+ * Weekly check-ins, or none when the table hasn't been created yet (a
+ * deploy whose database hasn't had the schema applied). Check-ins are
+ * optional, so their absence must never take the Goals or Analysis page down.
+ */
+export async function readCheckIns() {
+  try {
+    return await prisma.weeklyCheckIn.findMany({ orderBy: { weekStart: 'asc' } })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2021') {
+      console.warn('WeeklyCheckIn table is missing; run `npx prisma db push` (or migrate deploy). Continuing without check-ins.')
+      return []
+    }
+    throw err
+  }
+}
+
 const nums = (v: unknown): number[] | null =>
   Array.isArray(v) && v.every(x => typeof x === 'number') ? (v as number[]) : null
 
@@ -41,7 +58,7 @@ export async function loadRaceData(session: Session | null): Promise<RaceData> {
         stream: { select: { time: true, distance: true, heartrate: true } },
       },
     }),
-    session?.isDemo ? [] : prisma.weeklyCheckIn.findMany({ orderBy: { weekStart: 'asc' } }),
+    session?.isDemo ? [] : readCheckIns(),
   ])
   const timeZone = timeZoneFrom(settings)
   const today = dayKeyInZone(new Date(), timeZone)

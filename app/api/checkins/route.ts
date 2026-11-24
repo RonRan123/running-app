@@ -1,5 +1,7 @@
 import { requireAdmin } from '@/lib/guards'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { readCheckIns } from '@/lib/raceServer'
 import { dayKeyInZone, weekStartKey } from '@/lib/activitySummary'
 import { timeZoneFrom } from '@/lib/userSettings'
 
@@ -15,8 +17,7 @@ export async function GET() {
   const { error } = await requireAdmin()
   if (error) return error
 
-  const checkIns = await prisma.weeklyCheckIn.findMany({ orderBy: { weekStart: 'asc' } })
-  return Response.json(checkIns)
+  return Response.json(await readCheckIns())
 }
 
 export async function POST(request: Request) {
@@ -44,10 +45,20 @@ export async function POST(request: Request) {
   const note = typeof body?.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 500) : null
 
   const data = { effort, freshness, soreness, enjoyment, note }
-  const saved = await prisma.weeklyCheckIn.upsert({
-    where: { weekStart },
-    create: { weekStart, ...data },
-    update: data,
-  })
-  return Response.json(saved, { status: 201 })
+  try {
+    const saved = await prisma.weeklyCheckIn.upsert({
+      where: { weekStart },
+      create: { weekStart, ...data },
+      update: data,
+    })
+    return Response.json(saved, { status: 201 })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2021') {
+      return Response.json(
+        { error: 'Check-ins are not set up on this database yet (run `npx prisma db push`).' },
+        { status: 503 },
+      )
+    }
+    throw err
+  }
 }
