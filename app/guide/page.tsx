@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import AppShell from '@/components/AppShell'
 import OpenFromHash from './OpenFromHash'
+import PrinciplesTable from '@/components/race/PrinciplesTable'
 
 export const metadata = {
   title: 'How RONR Works — Running Dashboard',
@@ -16,6 +17,7 @@ const toc = [
   { id: 'terms', label: 'Key terms' },
   { id: 'pages', label: 'The pages' },
   { id: 'charts', label: 'Analysis charts' },
+  { id: 'race-rules', label: 'Race plan' },
   { id: 'routine', label: 'Weekly routine' },
 ]
 
@@ -475,6 +477,39 @@ export default async function GuidePage() {
               </p>
             </Chart>
           </ChartGroup>
+        </Section>
+
+        <Section
+          id="race-rules"
+          title="The race plan and the rules behind it"
+          intro="Add a race on Goals and it gets a week-by-week plan to race day, re-planned every Monday from what you ran."
+        >
+          <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-3 text-sm text-zinc-700 leading-relaxed">
+            <p>
+              <strong className="text-zinc-900">Reading the mileage chart.</strong> Each column is one Monday–Sunday
+              week. The <strong>grey bar</strong> is that week&apos;s planned total. The <strong>blue bar</strong>{' '}
+              inside it is what you actually ran (lighter while the week is in progress). The{' '}
+              <strong>orange dot</strong>{' '}is the week&apos;s planned long run, drawn on the same scale: a dot at 8 on
+              a 25 bar means an 8-mile long run inside a 25-mile week. Hatched bars are cutback weeks. Coloured bands
+              on top show the phase.
+            </p>
+            <p>
+              <strong className="text-zinc-900">Projected finish.</strong> “If you raced today” blends Riegel’s formula
+              from your recent hard efforts with a heart-rate-vs-pace fit from everyday runs, shown as a range with a
+              confidence level. “If training goes to plan” is a deliberately cautious estimate for race day.
+            </p>
+            <p>
+              <strong className="text-zinc-900">Weekly check-in.</strong> At the end of each week you can say how hard
+              it felt, how fresh you are, and whether anything hurts. It takes ten seconds, it’s optional, and it can
+              only make the plan gentler.
+            </p>
+            <p>
+              <strong className="text-zinc-900">Why?</strong> Tap any week or the projection to see each rule that
+              set it, the numbers it used, and how solid the evidence is. Every rule is listed below; this table is
+              generated from the same file the plan reads.
+            </p>
+          </div>
+          <PrinciplesTable />
         </Section>
 
         <Section id="routine" title="A simple weekly routine">

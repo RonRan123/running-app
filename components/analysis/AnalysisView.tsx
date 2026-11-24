@@ -17,7 +17,7 @@ import {
   zonesOn,
 } from '@/lib/analysis'
 import { dayKeyInZone } from '@/lib/activitySummary'
-import { planNextWeek } from '@/lib/trainingPlan'
+import { planNextWeek, type RaceWeekHint } from '@/lib/trainingPlan'
 import AerobicScatter from './AerobicScatter'
 import EfficiencyTrend from './EfficiencyTrend'
 import ZoneDistribution from './ZoneDistribution'
@@ -36,12 +36,15 @@ export default function AnalysisView({
   profile,
   timeZone,
   isDemo = false,
+  raceHint = null,
 }: {
   activities: AnalysisActivity[]
   profile: HrProfile
   timeZone: string
   /** Public demo: open on every run (they're spread out) and don't print the age. */
   isDemo?: boolean
+  /** This week of the nearest race plan; the 7-day plan follows it. */
+  raceHint?: RaceWeekHint | null
 }) {
   const { unit, changeUnit } = useUnit()
 
@@ -80,8 +83,8 @@ export default function AnalysisView({
   const loadRatio = useMemo(() => acuteChronicRatio(load), [load])
   const plan = useMemo(
     () =>
-      planNextWeek({ activities, profile, timeZone, today: dayKeyInZone(new Date(), timeZone) }),
-    [activities, profile, timeZone],
+      planNextWeek({ activities, profile, timeZone, today: dayKeyInZone(new Date(), timeZone), race: raceHint }),
+    [activities, profile, timeZone, raceHint],
   )
   const longRuns = useMemo(() => longRunByWeek(activities), [activities])
 

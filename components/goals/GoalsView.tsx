@@ -2,7 +2,9 @@
 
 import UnitToggle from '@/components/UnitToggle'
 import { useUnit } from '@/lib/useUnit'
-import type { DistanceRecord, RacePrediction } from '@/lib/records'
+import type { DistanceRecord } from '@/lib/records'
+import type { Prediction } from '@/lib/racePrediction'
+import type { Phase } from '@/lib/racePlan'
 import RaceGoalCard from './RaceGoalCard'
 import GoalForm from './GoalForm'
 import PrBoard from './PrBoard'
@@ -16,7 +18,10 @@ export interface GoalWithPrediction {
   date: string
   distance: number // km
   goalTime: number // seconds
-  prediction: RacePrediction | null
+  prediction: Prediction | null
+  /** This week of the race plan, while the season is running. */
+  week: { number: number; of: number; phase: Phase; cutback: boolean; targetKm: number; doneKm: number } | null
+  startsOn: string | null // season start, before it begins
 }
 
 export default function GoalsView({
@@ -38,7 +43,7 @@ export default function GoalsView({
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">Goals & Records</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
-            Race targets, Riegel-predicted finish times, and your all-time best efforts.
+            Race plans, projected finish times, and your all-time best efforts.
           </p>
         </div>
         <UnitToggle unit={unit} onChange={changeUnit} />

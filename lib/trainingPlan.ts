@@ -6,6 +6,7 @@ import {
   type HrProfile,
 } from '@/lib/analysis'
 import { addDaysToKey, dayKeyInZone } from '@/lib/activitySummary'
+import { RULES } from '@/lib/racePrinciples'
 
 // Rule-based 7-day plan for the Analysis page. Deterministic: the output
 // depends only on the input (no clock, no network), so the same history on
@@ -37,6 +38,21 @@ export interface PlanInput {
   profile: HrProfile
   today: string // yyyy-MM-dd in the user's time zone
   timeZone: string
+  /** This week of a race plan (lib/racePlan.ts), when a race is coming up. */
+  race?: RaceWeekHint | null
+}
+
+/**
+ * What the season plan wants this week. The 7-day plan still applies its own
+ * safety rules and takes the lower of the two; it lays the workout and hill
+ * sprints onto days. Text may hold {pace:…} tokens (see lib/raceFormat.ts).
+ */
+export interface RaceWeekHint {
+  label: string // e.g. "NYC Half · Build wk 8"
+  targetMin: number
+  longMin: number
+  workout: { label: string; detail: string } | null
+  hills: string | null
 }
 
 export type DayType = 'easy' | 'long' | 'rest'
@@ -49,6 +65,8 @@ export interface PlanDay {
   strength: boolean
   strides: boolean
   movedLong: boolean // Sunday make-up for a missed Saturday long run
+  workout: { label: string; detail: string } | null // race plan's quality session
+  hills: boolean
 }
 
 /** One line of the working shown under "How this was set". */
@@ -150,6 +168,7 @@ export interface LayoutContext {
   movedLong: boolean
   stridesOk: boolean
   pace: number | null
+  longShare?: number // defaults to LONG_SHARE; a race plan sets its own
 }
 
 function makeDay(date: string, runMin: number, pace: number | null): PlanDay {
@@ -161,6 +180,8 @@ function makeDay(date: string, runMin: number, pace: number | null): PlanDay {
     strength: false,
     strides: false,
     movedLong: false,
+    workout: null,
+    hills: false,
   }
 }
 
@@ -179,7 +200,7 @@ export function layoutWeek(weekMin: number, ctx: LayoutContext): PlanDay[] {
     longCount > 0
       ? Math.max(
           MIN_RUN_MIN,
-          floor5(Math.min(ctx.longCap, LONG_SHARE * weekMin, ctx.lastLong + LONG_STEP_MIN)),
+          floor5(Math.min(ctx.longCap, (ctx.longShare ?? LONG_SHARE) * weekMin, ctx.lastLong + LONG_STEP_MIN)),
         )
       : 0
   const easyMin = weekMin - longMin * longCount
@@ -228,7 +249,7 @@ function minimumWeek(start: string, pace: number | null): PlanDay[] {
 
 const totalMin = (days: PlanDay[]) => days.reduce((s, d) => s + d.runMin, 0)
 
-export function planNextWeek({ activities, profile, today, timeZone }: PlanInput): WeekPlan {
+export function planNextWeek({ activities, profile, today, timeZone, race }: PlanInput): WeekPlan {
   const acts = withoutExcluded(activities).filter(a => a.duration > 0)
   const dayOf = (a: AnalysisActivity) => dayKeyInZone(new Date(a.date), timeZone)
   const runs: Run[] = acts
@@ -286,6 +307,7 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
     phase: PlanPhase,
     extras: { minimumWeek?: boolean; trimmed?: boolean } = {},
   ): WeekPlan => {
+    if (race && (phase.kind === 'build' || phase.kind === 'cutback')) placeRaceSessions(days, race)
     const total = totalMin(days)
     const distances = days.filter(d => d.runMin > 0).map(d => d.distanceKm)
     return {
@@ -389,6 +411,16 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
     }
   }
 
+  if (race && phase.kind !== 'return') {
+    tags.push(race.label)
+    if (race.targetMin < target) {
+      target = race.targetMin
+      calc.push(planned(`Race plan target · ${race.label}`, Math.round(target)))
+    } else if (race.targetMin > target + 5) {
+      calc.push({ label: `Race plan wants ${Math.round(race.targetMin)} min; this plan's safety ceiling is lower`, text: 'kept lower' })
+    }
+  }
+
   const rounded = floor5(target)
   calc.push(planned('Rounded down to 5', rounded))
 
@@ -405,7 +437,9 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
   const lastLong = lastLongRun(history, start)
   const ctx: LayoutContext = {
     start,
-    longCap: floor5(Math.min(LONG_SHARE * rounded, lastLong + LONG_STEP_MIN)),
+    longCap: floor5(
+      Math.min(race ? race.longMin : LONG_SHARE * rounded, lastLong + LONG_STEP_MIN),
+    ),
     lastLong,
     movedLong:
       weekday(start) === SUNDAY &&
@@ -413,6 +447,7 @@ export function planNextWeek({ activities, profile, today, timeZone }: PlanInput
       !history.some(r => r.day === addDaysToKey(start, -1)),
     stridesOk: stridesAllowed(runDays, start),
     pace,
+    longShare: race ? RULES.longShare : undefined,
   }
 
   // Rule 4: shrink 5 min at a time until the projected ratio is ≤ 1.3. The
@@ -495,4 +530,25 @@ function rangeLabel(from: string, to: string) {
   const [, tm, td] = to.split('-').map(Number)
   const head = `${MONTHS[fm - 1]} ${fd}`
   return fm === tm ? `${head} – ${td}` : `${head} – ${MONTHS[tm - 1]} ${td}`
+}
+
+/**
+ * Put the race plan's workout on a midweek easy day (Thursday, then
+ * Wednesday, then Tuesday — never the day before the long run) and hill
+ * sprints on a different easy day.
+ */
+function placeRaceSessions(days: PlanDay[], race: RaceWeekHint) {
+  const easy = (wd: number) =>
+    days.find(d => d.type === 'easy' && d.runMin > 0 && weekday(d.date) === wd && !d.workout && !d.hills)
+  if (race.workout) {
+    const day = easy(4) ?? easy(3) ?? easy(2)
+    if (day) {
+      day.workout = race.workout
+      day.strides = false
+    }
+  }
+  if (race.hills) {
+    const day = easy(2) ?? easy(1) ?? easy(3)
+    if (day) day.hills = true
+  }
 }

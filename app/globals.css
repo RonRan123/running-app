@@ -22,6 +22,24 @@
   }
 }
 
+/* Form fields sit on white cards everywhere, so they always use dark text,
+   even when the OS is in dark mode (which lightens --foreground above).
+   Placeholders are zinc-500 so they stay readable. Utilities can still
+   override both. */
+@layer base {
+  input,
+  select,
+  textarea {
+    color: #18181b;
+    color-scheme: light;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: #71717a;
+    opacity: 1;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
