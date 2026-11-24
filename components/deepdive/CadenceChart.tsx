@@ -48,7 +48,7 @@ export default function CadenceChart({ streams, unit }: { streams: RunStreams; u
             type="number"
             domain={['dataMin', 'dataMax']}
             tickFormatter={d => d.toFixed(1)}
-            tick={{ fontSize: 12, fill: '#a1a1aa' }}
+            tick={{ fontSize: 12, fill: '#71717a' }}
             tickLine={false}
             axisLine={{ stroke: '#e4e4e7' }}
             unit={` ${unit}`}
@@ -56,7 +56,7 @@ export default function CadenceChart({ streams, unit }: { streams: RunStreams; u
           <YAxis
             domain={['auto', 'auto']}
             tickFormatter={(v: number) => Math.round(v).toString()}
-            tick={{ fontSize: 12, fill: '#a1a1aa' }}
+            tick={{ fontSize: 12, fill: '#71717a' }}
             tickLine={false}
             axisLine={{ stroke: '#e4e4e7' }}
             unit=" spm"

@@ -84,7 +84,7 @@ export default function SegmentsView({
       </div>
 
       {segments.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center text-sm text-zinc-400">
+        <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center text-sm text-zinc-500">
           No segments yet.{' '}
           {isAdmin
             ? 'Press Rediscover to find the stretches you run most often.'
@@ -108,7 +108,7 @@ export default function SegmentsView({
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-zinc-900 truncate">
                       {s.name}
-                      {s.pinned && <span className="ml-1.5 text-xs text-zinc-400">· pinned</span>}
+                      {s.pinned && <span className="ml-1.5 text-xs text-zinc-500">· pinned</span>}
                     </p>
                     <p className="text-xs text-zinc-500 mt-0.5">
                       {formatDistance(s.lengthM / 1000, unit)}
@@ -119,13 +119,13 @@ export default function SegmentsView({
                 </div>
                 <dl className="grid grid-cols-2 gap-2 mt-3 text-xs">
                   <div>
-                    <dt className="text-zinc-400">Best</dt>
+                    <dt className="text-zinc-500">Best</dt>
                     <dd className="text-zinc-900 font-medium">
                       {formatDuration(Math.round(s.bestSec))} · {formatPace(paceOf(s.bestSec, s.lengthM), unit)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-zinc-400">Latest · {format(new Date(s.latestDate), 'MMM d')}</dt>
+                    <dt className="text-zinc-500">Latest · {format(new Date(s.latestDate), 'MMM d')}</dt>
                     <dd className="text-zinc-900 font-medium">
                       {formatDuration(Math.round(s.latestSec))} · {formatPace(paceOf(s.latestSec, s.lengthM), unit)}
                     </dd>

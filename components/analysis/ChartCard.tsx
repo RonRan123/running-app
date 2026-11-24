@@ -7,7 +7,7 @@ export function HelpLink({ id, label }: { id: string; label: string }) {
       href={`/guide#${id}`}
       aria-label={`How to read ${label}`}
       title={`How to read ${label}`}
-      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-zinc-300 text-[10px] font-medium leading-none text-zinc-400 hover:border-zinc-900 hover:text-zinc-900 transition-colors"
+      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-zinc-300 text-[10px] font-medium leading-none text-zinc-500 hover:border-zinc-900 hover:text-zinc-900 transition-colors"
     >
       ?
     </Link>
@@ -40,7 +40,7 @@ export default function ChartCard({
 
 export function ChartEmpty({ message }: { message: string }) {
   return (
-    <div className="h-64 flex items-center justify-center text-sm text-zinc-400 text-center px-6">
+    <div className="h-64 flex items-center justify-center text-sm text-zinc-500 text-center px-6">
       {message}
     </div>
   )

@@ -75,7 +75,7 @@ export default function PrProgression({ records }: { records: DistanceRecord[] }
               type="number"
               domain={['dataMin', 'dataMax']}
               tickFormatter={ts => format(ts, 'MMM d')}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
             />
@@ -83,7 +83,7 @@ export default function PrProgression({ records }: { records: DistanceRecord[] }
               reversed
               domain={['auto', 'auto']}
               tickFormatter={(s: number) => formatDuration(s)}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               width={72}

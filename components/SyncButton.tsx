@@ -43,7 +43,7 @@ export default function SyncButton() {
   return (
     <div className="flex items-center gap-3">
       {message && (
-        <span className={`text-sm ${message.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+        <span className={`text-sm ${message.ok ? 'text-emerald-700' : 'text-red-600'}`}>
           {message.text}
         </span>
       )}

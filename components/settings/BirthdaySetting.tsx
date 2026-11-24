@@ -50,7 +50,7 @@ export default function BirthdaySetting() {
   }
 
   if (loading) {
-    return <p className="text-sm text-zinc-400">Loading…</p>
+    return <p className="text-sm text-zinc-500">Loading…</p>
   }
 
   // Today's zones (recorded max doesn't affect the age-based thresholds shown).
@@ -97,11 +97,11 @@ export default function BirthdaySetting() {
           {saving ? 'Saving…' : 'Save'}
         </button>
         {birthDate && (
-          <span className="text-xs text-zinc-400">Saved: {format(parseISO(birthDate), 'MMMM d, yyyy')}</span>
+          <span className="text-xs text-zinc-500">Saved: {format(parseISO(birthDate), 'MMMM d, yyyy')}</span>
         )}
       </div>
       {message && (
-        <p className={`text-sm ${message.kind === 'ok' ? 'text-emerald-600' : 'text-rose-600'}`}>
+        <p className={`text-sm ${message.kind === 'ok' ? 'text-emerald-700' : 'text-rose-600'}`}>
           {message.text}
         </p>
       )}

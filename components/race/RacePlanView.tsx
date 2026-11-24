@@ -367,7 +367,7 @@ export default function RacePlanView({ view }: { view: RaceView }) {
           <div>
             <dt className="text-xs text-zinc-500">Taper</dt>
             <dd className="font-semibold mt-0.5">
-              {RULES.taperRates.map(r => `${Math.round(r * 100)}%`).join(' → ')} of peak
+              {RULES.taperRates.map(r => `${Math.round(r * 100)}%`).join(' → ')} of peak, then easy runs + race
             </dd>
           </div>
           <div>

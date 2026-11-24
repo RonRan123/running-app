@@ -47,7 +47,7 @@ export default function ElevationChart({ streams, unit }: { streams: RunStreams;
               type="number"
               domain={['dataMin', 'dataMax']}
               tickFormatter={d => d.toFixed(1)}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               unit={` ${unit}`}
@@ -55,7 +55,7 @@ export default function ElevationChart({ streams, unit }: { streams: RunStreams;
             <YAxis
               domain={['auto', 'auto']}
               tickFormatter={(v: number) => Math.round(v).toString()}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               unit={` ${eleUnit}`}

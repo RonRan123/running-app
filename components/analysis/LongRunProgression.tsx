@@ -42,13 +42,13 @@ export default function LongRunProgression({
             <XAxis
               dataKey="weekStart"
               tickFormatter={w => format(parseISO(w), 'MMM d')}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               minTickGap={24}
             />
             <YAxis
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               tickFormatter={v => `${v.toFixed(0)}`}

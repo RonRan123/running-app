@@ -73,7 +73,7 @@ export default function AerobicScatter({
               dataKey="distance"
               name="Distance"
               unit={` ${unit}`}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               domain={['auto', 'auto']}
@@ -82,7 +82,7 @@ export default function AerobicScatter({
               type="number"
               dataKey="hr"
               name="Avg HR"
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               domain={['dataMin - 5', 'dataMax + 5']}

@@ -58,7 +58,7 @@ export default function GoalsView({
       <div className="space-y-4">
         <h2 className="text-base font-semibold text-zinc-900">Race Goals</h2>
         {goals.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-zinc-200 p-8 text-center text-sm text-zinc-400">
+          <div className="bg-white rounded-2xl border border-zinc-200 p-8 text-center text-sm text-zinc-500">
             {isDemo
               ? 'Race goals are hidden in the demo.'
               : <>No race goal yet — add the race you&apos;re training for below.</>}

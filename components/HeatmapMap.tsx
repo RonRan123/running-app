@@ -315,7 +315,7 @@ export default function HeatmapMap() {
       <div className="relative h-[calc(100vh-18rem)] min-h-[400px] w-full bg-zinc-900 rounded-2xl border border-zinc-200 overflow-hidden">
         <div ref={containerRef} className="absolute inset-0" />
         {status !== 'ready' && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-400 px-6 text-center">
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-500 px-6 text-center">
             {status === 'loading' && 'Loading heatmap…'}
             {status === 'empty' &&
               'No GPS tracks yet. Sync from Intervals.icu or upload GPX/FIT files with GPS data.'}

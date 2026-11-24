@@ -88,7 +88,7 @@ export default function PaceChart({ streams, unit }: { streams: RunStreams; unit
                 type="number"
                 domain={['dataMin', 'dataMax']}
                 tickFormatter={t => formatDuration(t)}
-                tick={{ fontSize: 12, fill: '#a1a1aa' }}
+                tick={{ fontSize: 12, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={{ stroke: '#e4e4e7' }}
               />
@@ -96,7 +96,7 @@ export default function PaceChart({ streams, unit }: { streams: RunStreams; unit
                 reversed
                 domain={['auto', 'auto']}
                 tickFormatter={formatPaceTick}
-                tick={{ fontSize: 12, fill: '#a1a1aa' }}
+                tick={{ fontSize: 12, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={{ stroke: '#e4e4e7' }}
                 unit={`/${unit}`}

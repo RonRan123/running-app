@@ -110,15 +110,15 @@ export default function LoginHistory() {
       {visible && (
         <div className="mt-4">
           {loading && !data ? (
-            <div className="py-8 text-center text-sm text-zinc-400">Loading…</div>
+            <div className="py-8 text-center text-sm text-zinc-500">Loading…</div>
           ) : !data || data.events.length === 0 ? (
-            <div className="py-8 text-center text-sm text-zinc-400">No login events recorded yet</div>
+            <div className="py-8 text-center text-sm text-zinc-500">No login events recorded yet</div>
           ) : (
             <>
               <div className="overflow-x-auto rounded-xl border border-zinc-200 shadow-[2px_0_0_-1px_rgba(0,0,0,0.05)_inset]">
                 <table className="w-full text-sm min-w-[540px]">
                   <thead>
-                    <tr className="border-b border-zinc-100 text-left text-zinc-400 text-xs uppercase tracking-wide">
+                    <tr className="border-b border-zinc-100 text-left text-zinc-500 text-xs uppercase tracking-wide">
                       <th className="px-4 py-3 font-medium">Date & Time</th>
                       <th className="px-4 py-3 font-medium">Location</th>
                       <th className="px-4 py-3 font-medium">IP Address</th>
@@ -149,7 +149,7 @@ export default function LoginHistory() {
               {/* Pagination */}
               {data.pages > 1 && (
                 <div className="flex items-center justify-between mt-3">
-                  <p className="text-xs text-zinc-400">
+                  <p className="text-xs text-zinc-500">
                     {data.total} total event{data.total !== 1 ? 's' : ''} · page {data.page} of {data.pages}
                   </p>
                   <div className="flex gap-2">

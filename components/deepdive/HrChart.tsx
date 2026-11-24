@@ -114,7 +114,7 @@ export default function HrChart({
               type="number"
               domain={['dataMin', 'dataMax']}
               tickFormatter={t => formatDuration(t)}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
             />
@@ -123,7 +123,7 @@ export default function HrChart({
                 (dataMin: number) => Math.min(dataMin - 5, maf != null ? maf - 20 : dataMin - 5),
                 (dataMax: number) => Math.max(dataMax + 5, maf != null ? maf + 10 : dataMax + 5),
               ]}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               unit=" bpm"

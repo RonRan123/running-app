@@ -39,7 +39,7 @@ export default function RunDetailStats({
           key={stat.label}
           className="bg-white rounded-xl border border-zinc-200 px-4 py-4"
         >
-          <p className="text-xs text-zinc-400 uppercase tracking-wide font-medium mb-1">
+          <p className="text-xs text-zinc-500 uppercase tracking-wide font-medium mb-1">
             {stat.label}
           </p>
           <p className="text-lg font-semibold text-zinc-900 tabular-nums">{stat.value}</p>

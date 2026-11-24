@@ -67,7 +67,7 @@ export default function Zone2PaceTrend({
               type="number"
               domain={['dataMin', 'dataMax']}
               tickFormatter={ts => format(ts, 'MMM d')}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
             />
@@ -76,7 +76,7 @@ export default function Zone2PaceTrend({
               reversed
               domain={['auto', 'auto']}
               tickFormatter={formatTick}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               unit={`/${unit}`}

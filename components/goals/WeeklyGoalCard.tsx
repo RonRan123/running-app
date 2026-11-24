@@ -118,9 +118,9 @@ export default function WeeklyGoalCard({
           </button>
         )}
       </div>
-      {readOnly && <p className="text-xs text-zinc-400">The demo account can&apos;t change goals.</p>}
+      {readOnly && <p className="text-xs text-zinc-500">The demo account can&apos;t change goals.</p>}
       {message && (
-        <p className={`text-sm ${message.kind === 'ok' ? 'text-emerald-600' : 'text-rose-600'}`}>
+        <p className={`text-sm ${message.kind === 'ok' ? 'text-emerald-700' : 'text-rose-600'}`}>
           {message.text}
         </p>
       )}

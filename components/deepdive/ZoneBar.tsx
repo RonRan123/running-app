@@ -56,7 +56,7 @@ export default function ZoneBar({
                 {z.label} · {formatDuration(Math.round(zones[z.key]))} (
                 {Math.round((zones[z.key] / total) * 100)}%)
               </span>
-              <span className="text-zinc-400"> — {zoneDefinition(z.key, hrZones)}</span>
+              <span className="text-zinc-500"> — {zoneDefinition(z.key, hrZones)}</span>
             </div>
           </div>
         ))}

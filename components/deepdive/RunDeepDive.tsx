@@ -69,7 +69,7 @@ export default function RunDeepDive({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {stats.map(stat => (
           <div key={stat.label} className="bg-white rounded-xl border border-zinc-200 px-4 py-4">
-            <p className="text-xs text-zinc-400 uppercase tracking-wide font-medium mb-1">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide font-medium mb-1">
               {stat.label}
             </p>
             <p className="text-lg font-semibold text-zinc-900 tabular-nums">{stat.value}</p>
@@ -99,7 +99,7 @@ export default function RunDeepDive({
           <SplitsTable splits={unit === 'mi' ? splitsMi : splitsKm} unit={unit} />
         </>
       ) : (
-        <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center text-sm text-zinc-400">
+        <div className="bg-white rounded-2xl border border-zinc-200 p-12 text-center text-sm text-zinc-500">
           No detailed sensor data is stored for this run yet. Press Sync on the Runs page to
           backfill streams from Intervals.icu, or re-upload the original GPX/FIT file.
         </div>

@@ -47,7 +47,8 @@ export const RULES = {
   longStepKm: mi(1), // long run grows ≤ 1 mi per week
   longPeakKm: mi(13), // half-marathon long run peaks at 13 mi
   longCutbackRate: 0.7,
-  taperRates: [0.7, 0.5], // last two weeks as a share of peak (race week includes the race)
+  taperRates: [0.7], // taper weeks before race week, as a share of peak
+  raceWeekEasyShare: 0.3, // race week: short easy runs worth 30% of peak, plus the race itself
   taperWeeks: 2,
   peakWeeks: 3,
   maxBuildWeeks: 6,
@@ -179,8 +180,8 @@ const list: Principle[] = [
   {
     id: 'TAPER',
     title: 'Taper: less volume, keep intensity',
-    says: 'Cut volume over the final two weeks while keeping some race-pace running.',
-    value: RULES.taperRates.map(pct).join(' → '),
+    says: 'Cut volume over the final two weeks while keeping some race-pace running. Race week is a few short easy runs plus the race.',
+    value: `${RULES.taperRates.map(pct).join(' → ')} → ${pct(RULES.raceWeekEasyShare)} + race`,
     evidence: 'research',
     sources: ['Bosquet et al. 2007, Med Sci Sports Exerc (meta-analysis)', 'Mujika & Padilla 2003'],
   },

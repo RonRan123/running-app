@@ -98,11 +98,19 @@ describe('season plan before it starts', () => {
     }
   })
 
-  it('tapers to 70% then 50% of the peak and ends with the race', () => {
+  it('tapers to 70% of the peak, then race week is easy runs plus the race', () => {
     expect(p.weeks[15].targetKm).toBeCloseTo(p.peakKm * 0.7, 5)
-    expect(p.weeks[16].targetKm).toBeCloseTo(p.peakKm * 0.5, 5)
+    expect(p.weeks[16].targetKm).toBeCloseTo(p.peakKm * RULES.raceWeekEasyShare + RACE.distanceKm, 5)
     expect(p.weeks[16].longKm).toBe(RACE.distanceKm)
     expect(p.weeks[16].sessions.map(s => s.kind)).toEqual(['strides', 'race'])
+  })
+
+  it('race week always plans at least the race (the bar contains the race dot)', () => {
+    const low = plan({ runs: history(START, [8 * MI, 8 * MI, 8 * MI, 8 * MI]) })
+    for (const q of [p, low]) {
+      const last = q.weeks[q.weeks.length - 1]
+      expect(last.targetKm).toBeGreaterThan(last.longKm)
+    }
   })
 
   it('keeps the long run ≤ 35% of the week and ≤ 13 mi, peaking before the taper', () => {

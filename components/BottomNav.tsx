@@ -64,7 +64,7 @@ export default function BottomNav() {
               key={tab.href}
               href={tab.href}
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 min-h-[56px] transition-colors text-xs font-medium ${
-                active ? 'text-zinc-900' : 'text-zinc-400'
+                active ? 'text-zinc-900' : 'text-zinc-500'
               }`}
               aria-current={active ? 'page' : undefined}
             >

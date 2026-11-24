@@ -105,7 +105,7 @@ function Chart({ id, name, want, children }: { id: string; name: string; want: s
     <details id={id} className="group scroll-mt-20 bg-white rounded-xl border border-zinc-200 open:shadow-sm">
       <summary className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <svg
-          className="h-3 w-3 text-zinc-400 transition-transform group-open:rotate-90 shrink-0"
+          className="h-3 w-3 text-zinc-500 transition-transform group-open:rotate-90 shrink-0"
           viewBox="0 0 16 16"
           aria-hidden
         >
@@ -125,7 +125,7 @@ function Chart({ id, name, want, children }: { id: string; name: string; want: s
 function ChartGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-400">{title}</h3>
+      <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-500">{title}</h3>
       {children}
     </div>
   )
@@ -215,7 +215,7 @@ export default async function GuidePage() {
               },
             ].map(s => (
               <li key={s.n} className="bg-white rounded-2xl border border-zinc-200 p-4 space-y-1.5">
-                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-xs font-semibold text-white">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-orange-700 text-xs font-semibold text-white">
                   {s.n}
                 </span>
                 <p className="text-sm font-semibold text-zinc-900">{s.title}</p>

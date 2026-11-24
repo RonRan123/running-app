@@ -15,17 +15,15 @@
   --font-sans: var(--font-geist-sans);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* The app is designed light-only (white cards on a zinc-50 page). Switching
+   the foreground to near-white in OS dark mode made every element without
+   its own text colour invisible on those white cards, so it stays light. */
+:root {
+  color-scheme: light;
 }
 
-/* Form fields sit on white cards everywhere, so they always use dark text,
-   even when the OS is in dark mode (which lightens --foreground above).
-   Placeholders are zinc-500 so they stay readable. Utilities can still
-   override both. */
+/* Form fields sit on white cards everywhere: dark text, and zinc-500
+   placeholders so they stay readable. Utilities can still override both. */
 @layer base {
   input,
   select,

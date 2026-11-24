@@ -77,7 +77,7 @@ export default function ZoneDistribution({ weekly }: { weekly: WeeklyZones[] }) 
               <XAxis
                 dataKey="weekStart"
                 tickFormatter={w => format(parseISO(w), 'MMM d')}
-                tick={{ fontSize: 12, fill: '#a1a1aa' }}
+                tick={{ fontSize: 12, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={{ stroke: '#e4e4e7' }}
               />
@@ -85,7 +85,7 @@ export default function ZoneDistribution({ weekly }: { weekly: WeeklyZones[] }) 
                 domain={view === 'pct' ? [0, 100] : [0, 'auto']}
                 tickFormatter={v => (view === 'pct' ? `${v}%` : `${v}h`)}
                 allowDecimals={view === 'time'}
-                tick={{ fontSize: 12, fill: '#a1a1aa' }}
+                tick={{ fontSize: 12, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={{ stroke: '#e4e4e7' }}
               />
@@ -99,7 +99,7 @@ export default function ZoneDistribution({ weekly }: { weekly: WeeklyZones[] }) 
                       <p className="font-medium text-zinc-900">
                         Week of {format(parseISO(label as string), 'MMM d, yyyy')}
                       </p>
-                      <p className="text-emerald-600 mt-1">
+                      <p className="text-emerald-700 mt-1">
                         Easy {hm(p.easySec)} · {p.easyPct.toFixed(0)}%
                       </p>
                       <p className="text-amber-600">
@@ -112,7 +112,7 @@ export default function ZoneDistribution({ weekly }: { weekly: WeeklyZones[] }) 
                         <p className="text-zinc-500 mt-1">Below the {EASY_TARGET_PCT}% easy target</p>
                       )}
                       {p.fallbackRuns > 0 && (
-                        <p className="text-zinc-400 mt-1">
+                        <p className="text-zinc-500 mt-1">
                           {p.fallbackRuns} {p.fallbackRuns === 1 ? 'run' : 'runs'} without an HR
                           stream, classified by average HR
                         </p>
@@ -121,7 +121,7 @@ export default function ZoneDistribution({ weekly }: { weekly: WeeklyZones[] }) 
                   )
                 }}
               />
-              <Legend formatter={value => SERIES[value] ?? value} wrapperStyle={{ fontSize: 12 }} />
+              <Legend formatter={value => <span style={{ color: '#3f3f46' }}>{SERIES[value] ?? value}</span>} wrapperStyle={{ fontSize: 12 }} />
               {view === 'pct' && (
                 <ReferenceLine
                   y={EASY_TARGET_PCT}

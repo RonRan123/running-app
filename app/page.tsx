@@ -44,7 +44,7 @@ export default function Home() {
         </p>
         <Link
           href="/login"
-          className="bg-orange-500 text-white text-base font-semibold px-9 py-3 rounded-full hover:bg-orange-600 transition-colors"
+          className="bg-orange-700 text-white text-base font-semibold px-9 py-3 rounded-full hover:bg-orange-800 transition-colors"
         >
           Get Started
         </Link>

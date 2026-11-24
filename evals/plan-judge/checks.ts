@@ -98,9 +98,12 @@ export function runChecks({ plan, sim, raceKm }: CheckInput): CheckResult[] {
     const ev: string[] = []
     const taper = W.filter(w => w.phase === 'taper')
     if (W.length >= 6 && taper.length < 2) ev.push(`only ${taper.length} taper week(s) in a ${W.length}-week season`)
-    for (const w of taper) if (w.targetKm >= peak - EPS) ev.push(`wk ${w.number}: taper ${mi(w.targetKm)} not below peak ${mi(peak)}`)
+    for (const w of taper.filter(w => !isRaceWeek(plan, w))) {
+      if (w.targetKm >= peak - EPS) ev.push(`wk ${w.number}: taper ${mi(w.targetKm)} not below peak ${mi(peak)}`)
+    }
     const last = W[W.length - 1]
-    if (last && last.targetKm > 0.6 * peak + EPS) ev.push(`race week ${mi(last.targetKm)} > 60% of peak ${mi(peak)}`)
+    if (last && last.targetKm - raceKm > 0.4 * peak + EPS) ev.push(`race week has ${mi(last.targetKm - raceKm)} besides the race, > 40% of peak ${mi(peak)}`)
+    if (last && last.targetKm < raceKm - EPS) ev.push(`race week plans ${mi(last.targetKm)}, less than the race itself`)
     if (last && !last.sessions.some(s => s.kind === 'race')) ev.push('race week has no race session')
     check('TAPER', 'gate', 'Two-week taper below the peak, race in the last week', ev)
   }

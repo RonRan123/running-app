@@ -49,7 +49,7 @@ function hm(sec: number) {
 }
 
 const axisProps = {
-  tick: { fontSize: 12, fill: '#a1a1aa' },
+  tick: { fontSize: 12, fill: '#71717a' },
   tickLine: false,
   axisLine: { stroke: '#e4e4e7' },
 } as const
@@ -72,7 +72,7 @@ function SplitTooltip({ p }: { p: Point }) {
         Longest continuous run {hm(p.longestRunMin * 60)} · {p.breaks}{' '}
         {p.breaks === 1 ? 'break' : 'breaks'}
       </p>
-      <p className="text-zinc-400 mt-1">
+      <p className="text-zinc-500 mt-1">
         {ROLLING_DAYS}-day running share {p.runningPctAvg.toFixed(0)}%
       </p>
     </div>
@@ -198,7 +198,7 @@ export default function RunWalkSplit({ activities }: { activities: AnalysisActiv
                       return active && p ? <SplitTooltip p={p} /> : null
                     }}
                   />
-                  <Legend itemSorter={null} wrapperStyle={{ fontSize: 12 }} />
+                  <Legend itemSorter={null} formatter={value => <span style={{ color: '#3f3f46' }}>{value}</span>} wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey={`running${suffix}`} name="Running" stackId="split" fill={COLORS.running} />
                   <Bar dataKey={`walking${suffix}`} name="Walking" stackId="split" fill={COLORS.walking} />
                   <Bar

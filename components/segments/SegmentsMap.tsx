@@ -141,7 +141,7 @@ export default function SegmentsMap({
     <div className={`relative ${height} w-full bg-zinc-100 rounded-2xl border border-zinc-200 overflow-hidden`}>
       <div ref={containerRef} className="absolute inset-0" />
       {(!ready || error) && (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-400 px-6 text-center">
+        <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-500 px-6 text-center">
           {error ?? 'Loading map…'}
         </div>
       )}

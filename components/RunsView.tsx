@@ -71,7 +71,7 @@ export default function RunsView({
 
         {/* Table */}
         {activities.length === 0 ? (
-          <div className="text-center py-24 text-zinc-400 lg:col-span-2">
+          <div className="text-center py-24 text-zinc-500 lg:col-span-2">
             <p className="text-lg font-medium">No runs yet</p>
             <p className="text-sm mt-1">Upload a GPX or FIT file, or sync from Intervals.icu</p>
           </div>
@@ -79,7 +79,7 @@ export default function RunsView({
           <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden overflow-x-auto lg:order-1 min-w-0">
             <table className="w-full text-sm min-w-[640px] lg:min-w-0">
               <thead>
-                <tr className="border-b border-zinc-100 text-left text-zinc-400 text-xs uppercase tracking-wide">
+                <tr className="border-b border-zinc-100 text-left text-zinc-500 text-xs uppercase tracking-wide">
                   <th className="px-5 lg:px-4 py-3 font-medium">Date</th>
                   <th className="px-5 lg:px-4 py-3 font-medium">Name</th>
                   <th className="px-5 lg:px-4 py-3 font-medium text-right whitespace-nowrap">Distance</th>

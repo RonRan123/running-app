@@ -20,6 +20,9 @@ import {
 import { KM_PER_MILE, type Unit } from '@/lib/units'
 
 const ACCENT = '#ea580c' // orange-600
+// The streak number sits on the flame, so the flame is one shade darker
+// (orange-700) to keep white text readable (≥ 4.5:1).
+const FLAME = '#c2410c'
 
 function dist(km: number, unit: Unit, decimals = 1) {
   return (unit === 'mi' ? km / KM_PER_MILE : km).toFixed(decimals)
@@ -60,10 +63,10 @@ function Flame({ count }: { count: number }) {
         <svg width="40" height="48" viewBox="4 0 16 22" aria-hidden="true">
           <path
             d="M12 1c1.2 4.6 6.5 7.2 6.5 13.4A6.5 6.5 0 0 1 5.5 14.4c0-2.6 1.3-4.5 2.6-5.8 0 2.4 1.3 3.8 2.6 3.8 0-3.6-1.4-6.4 1.3-11.4z"
-            fill={count > 0 ? ACCENT : '#d4d4d8'}
+            fill={count > 0 ? FLAME : '#d4d4d8'}
           />
         </svg>
-        <span className="absolute inset-x-0 top-[21px] text-center text-white font-bold text-base leading-5 tabular-nums">
+        <span className={`absolute inset-x-0 top-[21px] text-center ${count > 0 ? 'text-white' : 'text-zinc-700'} font-bold text-base leading-5 tabular-nums`}>
           {count}
         </span>
       </div>
@@ -105,7 +108,7 @@ function StreakCard({ days, todayKey, unit }: { days: DayMap; todayKey: string; 
                   </svg>
                 </span>
               ) : d.state === 'rest' ? (
-                <span className="w-7 h-7 rounded-full bg-zinc-100 text-xs text-zinc-500 flex items-center justify-center tabular-nums">
+                <span className="w-7 h-7 rounded-full bg-zinc-100 text-xs text-zinc-600 flex items-center justify-center tabular-nums">
                   {d.dayOfMonth}
                 </span>
               ) : (

@@ -376,15 +376,23 @@ function simulate(
       longKm = Math.max(s.long, RULES.longShare * target)
       ret = ret! + 1
     } else if (phase === 'taper') {
-      const rate = RULES.taperRates[Math.min(weekInPhase, RULES.taperRates.length - 1)]
       const from = peak > 0 ? peak : priorPeak
-      target = from * rate
       cutback = false
-      trail.push({ rule: 'TAPER', inputs: `Peak week ${km(from)}`, out: `${Math.round(rate * 100)}% → ${km(target)}` })
       if (i === n - 1) {
+        // Race week: a few short easy runs, then the race. The race is part
+        // of the week's total, so the bar always contains the race.
+        const easy = from * RULES.raceWeekEasyShare
+        target = easy + raceKm
         longKm = raceKm
-        trail.push({ rule: 'TAPER', inputs: 'Race week', out: `The race is the long run: ${km(raceKm)}` })
+        trail.push({
+          rule: 'TAPER',
+          inputs: `Peak week ${km(from)}`,
+          out: `Easy runs ${Math.round(RULES.raceWeekEasyShare * 100)}% → ${km(easy)}, plus the race ${km(raceKm)} = ${km(target)}`,
+        })
       } else {
+        const rate = RULES.taperRates[Math.min(weekInPhase, RULES.taperRates.length - 1)]
+        target = from * rate
+        trail.push({ rule: 'TAPER', inputs: `Peak week ${km(from)}`, out: `${Math.round(rate * 100)}% → ${km(target)}` })
         longKm = Math.max(peakLong, long) * RULES.longCutbackRate
         trail.push({ rule: 'TAPER', inputs: `Peak long run ${km(Math.max(peakLong, long))}`, out: `70% → ${km(longKm)}` })
       }

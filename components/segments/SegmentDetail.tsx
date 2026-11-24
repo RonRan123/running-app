@@ -233,7 +233,7 @@ export default function SegmentDetail({
                 type="number"
                 domain={[0, 'dataMax']}
                 tickFormatter={d => d.toFixed(1)}
-                tick={{ fontSize: 12, fill: '#a1a1aa' }}
+                tick={{ fontSize: 12, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={{ stroke: '#e4e4e7' }}
                 unit={` ${unit}`}
@@ -243,7 +243,7 @@ export default function SegmentDetail({
                 reversed
                 domain={['auto', 'auto']}
                 tickFormatter={paceTick}
-                tick={{ fontSize: 12, fill: '#a1a1aa' }}
+                tick={{ fontSize: 12, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={{ stroke: '#e4e4e7' }}
                 width={56}
@@ -253,7 +253,7 @@ export default function SegmentDetail({
                 orientation="right"
                 domain={['dataMin - 5', 'dataMax + 20']}
                 tickFormatter={(v: number) => `${Math.round(v)}`}
-                tick={{ fontSize: 11, fill: '#d4d4d8' }}
+                tick={{ fontSize: 11, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={false}
                 unit={` ${eleUnit}`}
@@ -278,7 +278,7 @@ export default function SegmentDetail({
                           )
                         })}
                       {payload.find(p => p.dataKey === 'ele') && (
-                        <p className="text-zinc-400">
+                        <p className="text-zinc-500">
                           Elevation {Math.round(payload.find(p => p.dataKey === 'ele')!.value as number)} {eleUnit}
                         </p>
                       )}
@@ -331,7 +331,7 @@ export default function SegmentDetail({
                 type="number"
                 domain={['dataMin', 'dataMax']}
                 tickFormatter={ts => format(ts, 'MMM d')}
-                tick={{ fontSize: 12, fill: '#a1a1aa' }}
+                tick={{ fontSize: 12, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={{ stroke: '#e4e4e7' }}
               />
@@ -340,7 +340,7 @@ export default function SegmentDetail({
                 reversed
                 domain={['auto', 'auto']}
                 tickFormatter={paceTick}
-                tick={{ fontSize: 12, fill: '#a1a1aa' }}
+                tick={{ fontSize: 12, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={{ stroke: '#e4e4e7' }}
                 width={56}
@@ -349,7 +349,7 @@ export default function SegmentDetail({
                 yAxisId="hr"
                 orientation="right"
                 domain={['auto', 'auto']}
-                tick={{ fontSize: 11, fill: '#fda4af' }}
+                tick={{ fontSize: 11, fill: '#be123c' }}
                 tickLine={false}
                 axisLine={false}
                 unit=" bpm"
@@ -394,7 +394,7 @@ export default function SegmentDetail({
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-xs text-zinc-400 border-y border-zinc-100">
+            <thead className="text-xs text-zinc-500 border-y border-zinc-100">
               <tr>
                 <th className="px-5 py-2 text-left font-medium w-8" />
                 <th className="py-2 text-left font-medium">Date</th>

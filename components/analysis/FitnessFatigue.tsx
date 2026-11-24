@@ -37,13 +37,13 @@ export default function FitnessFatigue({ load }: { load: LoadPoint[] }) {
             <XAxis
               dataKey="date"
               tickFormatter={d => format(parseISO(d), 'MMM')}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               minTickGap={40}
             />
             <YAxis
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               tickFormatter={v => v.toFixed(0)}
@@ -59,12 +59,12 @@ export default function FitnessFatigue({ load }: { load: LoadPoint[] }) {
                     </p>
                     <p className="text-blue-600 mt-1">Fitness {p.ctl.toFixed(1)}</p>
                     <p className="text-orange-600">Fatigue {p.atl.toFixed(1)}</p>
-                    <p className="text-emerald-600">Form {p.tsb.toFixed(1)}</p>
+                    <p className="text-emerald-700">Form {p.tsb.toFixed(1)}</p>
                   </div>
                 )
               }}
             />
-            <Legend formatter={value => SERIES[value] ?? value} wrapperStyle={{ fontSize: 12 }} />
+            <Legend formatter={value => <span style={{ color: '#3f3f46' }}>{SERIES[value] ?? value}</span>} wrapperStyle={{ fontSize: 12 }} />
             <ReferenceLine y={0} stroke="#e4e4e7" />
             <Line type="monotone" dataKey="ctl" stroke="#3b82f6" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="atl" stroke="#f97316" strokeWidth={1.5} dot={false} />

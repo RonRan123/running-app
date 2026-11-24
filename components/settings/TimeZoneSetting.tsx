@@ -57,7 +57,7 @@ export default function TimeZoneSetting() {
   }
 
   if (loading) {
-    return <p className="text-sm text-zinc-400">Loading…</p>
+    return <p className="text-sm text-zinc-500">Loading…</p>
   }
 
   return (
@@ -97,7 +97,7 @@ export default function TimeZoneSetting() {
         )}
       </div>
       {message && (
-        <p className={`text-sm ${message.kind === 'ok' ? 'text-emerald-600' : 'text-rose-600'}`}>
+        <p className={`text-sm ${message.kind === 'ok' ? 'text-emerald-700' : 'text-rose-600'}`}>
           {message.text}
         </p>
       )}

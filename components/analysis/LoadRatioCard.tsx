@@ -42,7 +42,7 @@ export default function LoadRatioCard({ ratio }: { ratio: number | null }) {
         This week&apos;s load vs. your 6-week base. 0.8–1.3 is the validated safe-build window.
       </p>
       {ratio === null || !band ? (
-        <div className="flex-1 flex items-center justify-center text-sm text-zinc-400 py-8">
+        <div className="flex-1 flex items-center justify-center text-sm text-zinc-500 py-8">
           Not enough history to compute a ratio yet.
         </div>
       ) : (

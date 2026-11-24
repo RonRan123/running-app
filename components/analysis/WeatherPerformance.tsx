@@ -173,7 +173,7 @@ export default function WeatherPerformance({
               dataKey="apparent"
               name="Feels like"
               unit={deg}
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               domain={['auto', 'auto']}
@@ -182,7 +182,7 @@ export default function WeatherPerformance({
               type="number"
               dataKey="ef"
               name="Efficiency"
-              tick={{ fontSize: 12, fill: '#a1a1aa' }}
+              tick={{ fontSize: 12, fill: '#71717a' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               domain={['auto', 'auto']}

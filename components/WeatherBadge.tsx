@@ -33,7 +33,7 @@ export default function WeatherBadge({
       </span>
       {items.map(item => (
         <div key={item.label} className="flex items-baseline gap-1.5">
-          <span className="text-xs text-zinc-400 uppercase tracking-wide font-medium">
+          <span className="text-xs text-zinc-500 uppercase tracking-wide font-medium">
             {item.label}
           </span>
           <span className="text-sm font-semibold text-zinc-900 tabular-nums">{item.value}</span>

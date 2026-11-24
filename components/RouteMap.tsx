@@ -112,7 +112,7 @@ export default function RouteMap({ coordinates }: { coordinates: RoutePoint[] })
 
   if (coordinates.length === 0) {
     return (
-      <div className="h-80 rounded-lg bg-zinc-50 flex items-center justify-center text-zinc-400 text-sm">
+      <div className="h-80 rounded-lg bg-zinc-50 flex items-center justify-center text-zinc-500 text-sm">
         No GPS data for this run
       </div>
     )
@@ -122,7 +122,7 @@ export default function RouteMap({ coordinates }: { coordinates: RoutePoint[] })
     <div className="relative h-80 rounded-lg overflow-hidden bg-zinc-50">
       <div ref={containerRef} className="absolute inset-0" />
       {(loading || error) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-zinc-50 text-sm text-zinc-400 px-6 text-center">
+        <div className="absolute inset-0 flex items-center justify-center bg-zinc-50 text-sm text-zinc-500 px-6 text-center">
           {error ?? 'Loading map…'}
         </div>
       )}

@@ -64,14 +64,14 @@ function FormChart({
             type="number"
             domain={['dataMin', 'dataMax']}
             tickFormatter={ts => format(ts, 'MMM d')}
-            tick={{ fontSize: 12, fill: '#a1a1aa' }}
+            tick={{ fontSize: 12, fill: '#71717a' }}
             tickLine={false}
             axisLine={{ stroke: '#e4e4e7' }}
           />
           <YAxis
             domain={['auto', 'auto']}
             tickFormatter={fmt}
-            tick={{ fontSize: 12, fill: '#a1a1aa' }}
+            tick={{ fontSize: 12, fill: '#71717a' }}
             tickLine={false}
             axisLine={{ stroke: '#e4e4e7' }}
           />

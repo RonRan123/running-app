@@ -66,7 +66,7 @@ export default function DateRangeSlider({ min, max, from, to, onChange }: Props)
           onChange={e => onChange(parseInput(e.target.value, from), to)}
           className="border border-zinc-300 rounded-lg px-2.5 py-1.5 text-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900"
         />
-        <span className="text-zinc-400">to</span>
+        <span className="text-zinc-500">to</span>
         <input
           type="date"
           value={format(to, 'yyyy-MM-dd')}
